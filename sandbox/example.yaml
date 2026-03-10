@@ -1,0 +1,47 @@
+app:
+  name: attendance-journal
+  port: 3000
+
+database:
+  host: localhost
+  name: attendance_db
+
+models:
+  - name: students
+    fields:
+      - name: first_name
+        type: varchar(100)
+        required: true
+      - name: last_name
+        type: varchar(100)
+        required: true
+      - name: email
+        type: varchar(255)
+        unique: true
+
+  - name: subjects
+    fields:
+      - name: name
+        type: varchar(200)
+        required: true
+
+  - name: lessons
+    fields:
+      - name: date
+        type: date
+        required: true
+      - name: subject_id
+        type: int
+        references: subjects.id
+
+  - name: attendance
+    fields:
+      - name: lesson_id
+        type: int
+        references: lessons.id
+      - name: student_id
+        type: int
+        references: students.id
+      - name: present
+        type: boolean
+        default: false
