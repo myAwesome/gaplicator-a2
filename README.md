@@ -2,6 +2,15 @@
 
 Generate a full-stack web application (database + server + client) from a single YAML config file.
 
+## Stack
+
+| Layer    | Technology        |
+|----------|-------------------|
+| Database | MySQL             |
+| Server   | Go + Gin + GORM   |
+| Client   | React             |
+| Auth     | JWT               |
+
 ## Concept
 
 Describe your app in YAML — `vibe-gen` scaffolds the entire stack and keeps it in sync as your config evolves.
@@ -10,7 +19,6 @@ Describe your app in YAML — `vibe-gen` scaffolds the entire stack and keeps it
 app:
   name: todo-app
   database:
-    type: postgres
     models:
       - name: Task
         fields:
@@ -21,10 +29,8 @@ app:
             type: boolean
             default: false
   server:
-    framework: express
     auth: jwt
   client:
-    framework: react
     pages:
       - name: Home
         route: /
@@ -36,42 +42,30 @@ Running `vibe-gen build app.yaml` produces:
 ```
 generated/
 ├── db/
-│   ├── migrations/
-│   └── schema.sql
+│   └── migrations/
 ├── server/
-│   ├── routes/
+│   ├── handlers/
 │   ├── models/
-│   └── index.ts
+│   ├── middleware/
+│   └── main.go
 └── client/
-    ├── src/
-    │   ├── pages/
-    │   └── components/
-    └── index.html
+    └── src/
+        ├── pages/
+        └── components/
 ```
 
 ## Features
 
-- **Database** — migrations, schema, ORM models
-- **Server** — REST API routes, auth, middleware
-- **Client** — pages, components, API bindings
+- **Database** — MySQL migrations and GORM models
+- **Server** — Gin REST API routes, JWT auth middleware
+- **Client** — React pages, components, API bindings
 - **Sync** — re-run `build` after config changes; only diffs are regenerated
-- **Extensible** — bring your own templates via the `templates/` directory
-
-## Supported Stack Options
-
-| Layer    | Options                          |
-|----------|----------------------------------|
-| Database | PostgreSQL, MySQL, SQLite        |
-| Server   | Express, Fastify, Hono           |
-| Client   | React, Vue, Svelte               |
-| Auth     | JWT, Session, OAuth2             |
-| ORM      | Drizzle, Prisma, Kysely          |
 
 ## Getting Started
 
 ```bash
 # install
-npm install -g vibe-gen
+go install github.com/myAwesome/vibe-gen@latest
 
 # scaffold from config
 vibe-gen build app.yaml
