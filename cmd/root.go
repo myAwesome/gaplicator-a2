@@ -7,7 +7,7 @@ import (
 )
 
 var rootCmd = &cobra.Command{
-	Use:   "mycli",
+	Use:   "gapp",
 	Short: "A CLI tool",
 }
 

@@ -1,4 +1,4 @@
-module mycli
+module gapp
 
 go 1.21.0
 

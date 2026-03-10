@@ -1,6 +1,6 @@
 package main
 
-import "mycli/cmd"
+import "gapp/cmd"
 
 func main() {
 	cmd.Execute()
