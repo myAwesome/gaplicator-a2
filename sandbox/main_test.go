@@ -338,6 +338,47 @@ func TestGenerateGoMod_ModuleName(t *testing.T) {
 	}
 }
 
+func TestGenerateEnv_AllVars(t *testing.T) {
+	cfg := &Config{
+		App: AppConfig{Name: "myapp", Port: 8080},
+		Database: DatabaseConfig{
+			Host:     "db.example.com",
+			Port:     5432,
+			Name:     "mydb",
+			User:     "admin",
+			Password: "s3cr3t",
+		},
+	}
+	out := GenerateEnv(cfg)
+
+	for _, want := range []string{
+		"DB_HOST=db.example.com",
+		"DB_PORT=5432",
+		"DB_USER=admin",
+		"DB_PASSWORD=s3cr3t",
+		"DB_NAME=mydb",
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("missing: %s", want)
+		}
+	}
+}
+
+func TestGenerateEnv_Defaults(t *testing.T) {
+	cfg := &Config{
+		App:      AppConfig{Name: "myapp", Port: 8080},
+		Database: DatabaseConfig{Host: "localhost", Port: 5432, Name: "mydb", User: "postgres", Password: "secret"},
+	}
+	out := GenerateEnv(cfg)
+
+	if !strings.Contains(out, "DB_PORT=5432") {
+		t.Error("expected DB_PORT=5432")
+	}
+	if !strings.Contains(out, "DB_USER=postgres") {
+		t.Error("expected DB_USER=postgres")
+	}
+}
+
 func min(a, b int) int {
 	if a < b {
 		return a

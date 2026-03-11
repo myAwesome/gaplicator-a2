@@ -73,6 +73,9 @@ var buildCmd = &cobra.Command{
 			{"Generating go.mod", func() error {
 				return writeFile(filepath.Join(out, "go.mod"), generator.GenerateGoMod(cfg))
 			}},
+			{"Generating .env", func() error {
+				return writeFile(filepath.Join(out, ".env"), generator.GenerateEnv(cfg))
+			}},
 		}
 
 		if err := os.MkdirAll(out, 0755); err != nil {

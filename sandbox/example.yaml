@@ -4,7 +4,10 @@ app:
 
 database:
   host: localhost
+  port: 5432
   name: attendance_db
+  user: postgres
+  password: secret
 
 models:
   - name: students
