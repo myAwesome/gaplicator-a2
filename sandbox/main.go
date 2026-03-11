@@ -129,6 +129,21 @@ func GenerateSchema(models []Model) string {
 	return sb.String()
 }
 
+// GenerateMigrationUp returns the UP migration SQL (CREATE TABLE statements in dependency order).
+func GenerateMigrationUp(models []Model) string {
+	return GenerateSchema(models)
+}
+
+// GenerateMigrationDown returns the DOWN migration SQL (DROP TABLE statements in reverse dependency order).
+func GenerateMigrationDown(models []Model) string {
+	sorted := topoSort(models)
+	var sb strings.Builder
+	for i := len(sorted) - 1; i >= 0; i-- {
+		fmt.Fprintf(&sb, "DROP TABLE IF EXISTS %s;\n", sorted[i].Name)
+	}
+	return sb.String()
+}
+
 func tableSQL(m Model) string {
 	var sb strings.Builder
 	fmt.Fprintf(&sb, "CREATE TABLE %s (\n", m.Name)
@@ -264,4 +279,20 @@ func main() {
 		log.Fatalf("write schema.sql: %v", err)
 	}
 	fmt.Println("\nGenerated schema.sql")
+
+	if err := os.MkdirAll("migrations", 0755); err != nil {
+		log.Fatalf("create migrations dir: %v", err)
+	}
+
+	upSQL := GenerateMigrationUp(cfg.Models)
+	if err := os.WriteFile("migrations/001_initial.up.sql", []byte(upSQL), 0644); err != nil {
+		log.Fatalf("write up migration: %v", err)
+	}
+	fmt.Println("Generated migrations/001_initial.up.sql")
+
+	downSQL := GenerateMigrationDown(cfg.Models)
+	if err := os.WriteFile("migrations/001_initial.down.sql", []byte(downSQL), 0644); err != nil {
+		log.Fatalf("write down migration: %v", err)
+	}
+	fmt.Println("Generated migrations/001_initial.down.sql")
 }
