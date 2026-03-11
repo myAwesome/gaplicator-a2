@@ -116,6 +116,94 @@ func ValidateConfig(cfg *Config) []error {
 	return errs
 }
 
+// GenerateSchema returns a schema.sql string for all models in dependency order.
+func GenerateSchema(models []Model) string {
+	sorted := topoSort(models)
+	var sb strings.Builder
+	for i, m := range sorted {
+		if i > 0 {
+			sb.WriteString("\n")
+		}
+		sb.WriteString(tableSQL(m))
+	}
+	return sb.String()
+}
+
+func tableSQL(m Model) string {
+	var sb strings.Builder
+	fmt.Fprintf(&sb, "CREATE TABLE %s (\n", m.Name)
+	sb.WriteString("    id SERIAL PRIMARY KEY")
+	for _, f := range m.Fields {
+		sb.WriteString(",\n")
+		fmt.Fprintf(&sb, "    %s %s", f.Name, strings.ToUpper(f.Type))
+		if f.Required {
+			sb.WriteString(" NOT NULL")
+		}
+		if f.Unique {
+			sb.WriteString(" UNIQUE")
+		}
+		if f.Default != nil {
+			fmt.Fprintf(&sb, " DEFAULT %s", formatDefault(f.Default))
+		}
+		if f.References != "" {
+			parts := strings.SplitN(f.References, ".", 2)
+			fmt.Fprintf(&sb, " REFERENCES %s(%s)", parts[0], parts[1])
+		}
+	}
+	sb.WriteString("\n);\n")
+	return sb.String()
+}
+
+func formatDefault(v any) string {
+	switch val := v.(type) {
+	case bool:
+		if val {
+			return "TRUE"
+		}
+		return "FALSE"
+	case string:
+		return fmt.Sprintf("'%s'", val)
+	default:
+		return fmt.Sprintf("%v", val)
+	}
+}
+
+// topoSort orders models so that referenced tables are created before their dependants.
+func topoSort(models []Model) []Model {
+	index := make(map[string]int, len(models))
+	for i, m := range models {
+		index[m.Name] = i
+	}
+	visited := make(map[string]bool, len(models))
+	result := make([]Model, 0, len(models))
+
+	var visit func(name string)
+	visit = func(name string) {
+		if visited[name] {
+			return
+		}
+		visited[name] = true
+		i, ok := index[name]
+		if !ok {
+			return
+		}
+		for _, f := range models[i].Fields {
+			if f.References != "" {
+				parts := strings.SplitN(f.References, ".", 2)
+				if parts[0] != name {
+					visit(parts[0])
+				}
+			}
+		}
+		result = append(result, models[i])
+	}
+
+	for _, m := range models {
+		visit(m.Name)
+	}
+	return result
+}
+
 func ParseConfig(path string) (*Config, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -170,4 +258,10 @@ func main() {
 			fmt.Println()
 		}
 	}
+
+	schema := GenerateSchema(cfg.Models)
+	if err := os.WriteFile("schema.sql", []byte(schema), 0644); err != nil {
+		log.Fatalf("write schema.sql: %v", err)
+	}
+	fmt.Println("\nGenerated schema.sql")
 }
