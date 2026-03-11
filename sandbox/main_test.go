@@ -293,6 +293,51 @@ func TestGenerateMain_DBHostEnv(t *testing.T) {
 	}
 }
 
+func TestGenerateGoMod_ModuleAndGo(t *testing.T) {
+	cfg := &Config{
+		App:      AppConfig{Name: "myapp", Port: 8080},
+		Database: DatabaseConfig{Host: "localhost", Name: "mydb"},
+	}
+	out := GenerateGoMod(cfg)
+
+	if !strings.HasPrefix(out, "module myapp\n") {
+		t.Errorf("expected 'module myapp' header, got: %q", out[:min(40, len(out))])
+	}
+	if !strings.Contains(out, "go 1.21") {
+		t.Error("expected go version directive")
+	}
+}
+
+func TestGenerateGoMod_Dependencies(t *testing.T) {
+	cfg := &Config{
+		App:      AppConfig{Name: "attendance-journal", Port: 3000},
+		Database: DatabaseConfig{Host: "localhost", Name: "mydb"},
+	}
+	out := GenerateGoMod(cfg)
+
+	for _, want := range []string{
+		"github.com/gin-gonic/gin",
+		"gorm.io/driver/postgres",
+		"gorm.io/gorm",
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("missing dependency: %s", want)
+		}
+	}
+}
+
+func TestGenerateGoMod_ModuleName(t *testing.T) {
+	cfg := &Config{
+		App:      AppConfig{Name: "shop-api", Port: 8080},
+		Database: DatabaseConfig{Host: "localhost", Name: "shopdb"},
+	}
+	out := GenerateGoMod(cfg)
+
+	if !strings.Contains(out, "module shop-api") {
+		t.Errorf("expected module name 'shop-api', got: %q", out)
+	}
+}
+
 func min(a, b int) int {
 	if a < b {
 		return a
