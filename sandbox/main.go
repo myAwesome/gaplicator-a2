@@ -6,6 +6,7 @@ import (
 	"os"
 	"regexp"
 	"strings"
+	"text/template"
 
 	"gopkg.in/yaml.v3"
 )
@@ -377,54 +378,77 @@ func GenerateGORMModels(models []Model, pkgName string) string {
 // It wires a GORM PostgreSQL connection and the Gin router together.
 // appImport is the module path of the generated app (e.g. "attendance-journal").
 func GenerateMain(cfg *Config, appImport string) string {
-	var sb strings.Builder
-	sb.WriteString("package main\n\n")
-	sb.WriteString("import (\n")
-	sb.WriteString("\t\"fmt\"\n")
-	sb.WriteString("\t\"log\"\n")
-	sb.WriteString("\t\"os\"\n\n")
-	sb.WriteString("\t\"github.com/gin-gonic/gin\"\n")
-	sb.WriteString("\t\"gorm.io/driver/postgres\"\n")
-	sb.WriteString("\t\"gorm.io/gorm\"\n\n")
-	fmt.Fprintf(&sb, "\t%q\n", appImport+"/models")
-	fmt.Fprintf(&sb, "\t%q\n", appImport+"/routes")
-	sb.WriteString(")\n\n")
+	const tmpl = `package main
 
-	sb.WriteString("func main() {\n")
+import (
+	"fmt"
+	"log"
+	"os"
 
-	sb.WriteString("\tdbPort := os.Getenv(\"DB_PORT\")\n")
-	sb.WriteString("\tif dbPort == \"\" {\n")
-	sb.WriteString("\t\tdbPort = \"5432\"\n")
-	sb.WriteString("\t}\n\n")
+	"github.com/gin-gonic/gin"
+	"gorm.io/driver/postgres"
+	"gorm.io/gorm"
 
-	sb.WriteString("\tdsn := fmt.Sprintf(\n")
-	sb.WriteString("\t\t\"host=%s user=%s password=%s dbname=%s port=%s sslmode=disable\",\n")
-	fmt.Fprintf(&sb, "\t\t%q, os.Getenv(\"DB_USER\"), os.Getenv(\"DB_PASSWORD\"), %q, dbPort,\n",
-		cfg.Database.Host, cfg.Database.Name)
-	sb.WriteString("\t)\n\n")
+	{{.ModelsImport}}
+	{{.RoutesImport}}
+)
 
-	sb.WriteString("\tdb, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})\n")
-	sb.WriteString("\tif err != nil {\n")
-	sb.WriteString("\t\tlog.Fatalf(\"connect db: %v\", err)\n")
-	sb.WriteString("\t}\n\n")
-
-	sb.WriteString("\tif err := db.AutoMigrate(\n")
-	for _, m := range cfg.Models {
-		fmt.Fprintf(&sb, "\t\t&models.%s{},\n", toPascalCase(toSingular(m.Name)))
+func main() {
+	dbPort := os.Getenv("DB_PORT")
+	if dbPort == "" {
+		dbPort = "5432"
 	}
-	sb.WriteString("\t); err != nil {\n")
-	sb.WriteString("\t\tlog.Fatalf(\"automigrate: %v\", err)\n")
-	sb.WriteString("\t}\n\n")
 
-	sb.WriteString("\tr := gin.Default()\n")
-	sb.WriteString("\troutes.RegisterRoutes(r, db)\n\n")
+	dsn := fmt.Sprintf(
+		"host=%s user=%s password=%s dbname=%s port=%s sslmode=disable",
+		{{.DBHost}}, os.Getenv("DB_USER"), os.Getenv("DB_PASSWORD"), {{.DBName}}, dbPort,
+	)
 
-	fmt.Fprintf(&sb, "\tif err := r.Run(\":%d\"); err != nil {\n", cfg.App.Port)
-	sb.WriteString("\t\tlog.Fatalf(\"server: %v\", err)\n")
-	sb.WriteString("\t}\n")
-	sb.WriteString("}\n")
+	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
+	if err != nil {
+		log.Fatalf("connect db: %v", err)
+	}
 
-	return sb.String()
+	if err := db.AutoMigrate(
+{{- range .Models}}
+		&models.{{.}}{},
+{{- end}}
+	); err != nil {
+		log.Fatalf("automigrate: %v", err)
+	}
+
+	r := gin.Default()
+	routes.RegisterRoutes(r, db)
+
+	if err := r.Run(":{{.Port}}"); err != nil {
+		log.Fatalf("server: %v", err)
+	}
+}
+`
+	models := make([]string, len(cfg.Models))
+	for i, m := range cfg.Models {
+		models[i] = toPascalCase(toSingular(m.Name))
+	}
+
+	data := struct {
+		ModelsImport string
+		RoutesImport string
+		DBHost       string
+		DBName       string
+		Port         int
+		Models       []string
+	}{
+		ModelsImport: fmt.Sprintf("%q", appImport+"/models"),
+		RoutesImport: fmt.Sprintf("%q", appImport+"/routes"),
+		DBHost:       fmt.Sprintf("%q", cfg.Database.Host),
+		DBName:       fmt.Sprintf("%q", cfg.Database.Name),
+		Port:         cfg.App.Port,
+		Models:       models,
+	}
+
+	var buf strings.Builder
+	template.Must(template.New("main").Parse(tmpl)).Execute(&buf, data) //nolint:errcheck
+	return buf.String()
 }
 
 // GenerateGinRoutes returns Go source code with Gin CRUD handlers and a RegisterRoutes
