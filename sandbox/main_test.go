@@ -236,6 +236,63 @@ func TestGenerateMain_RouterAndServer(t *testing.T) {
 	}
 }
 
+func TestGenerateDockerCompose_Services(t *testing.T) {
+	cfg := &Config{
+		App:      AppConfig{Name: "myapp", Port: 8080},
+		Database: DatabaseConfig{Host: "localhost", Name: "mydb"},
+		Models:   []Model{{Name: "users", Fields: []Field{{Name: "name", Type: "text"}}}},
+	}
+	out := GenerateDockerCompose(cfg)
+
+	for _, want := range []string{
+		"services:",
+		"app:",
+		"postgres:",
+		"image: postgres:16-alpine",
+		`"8080:8080"`,
+		"DB_HOST: postgres",
+		"POSTGRES_DB: mydb",
+		"postgres_data:",
+		"service_healthy",
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("missing: %s", want)
+		}
+	}
+}
+
+func TestGenerateDockerCompose_PortAndDBName(t *testing.T) {
+	cfg := &Config{
+		App:      AppConfig{Name: "journal", Port: 3000},
+		Database: DatabaseConfig{Host: "localhost", Name: "attendance_db"},
+		Models:   []Model{{Name: "items", Fields: []Field{{Name: "title", Type: "text"}}}},
+	}
+	out := GenerateDockerCompose(cfg)
+
+	if !strings.Contains(out, `"3000:3000"`) {
+		t.Error("expected port 3000 in app service")
+	}
+	if !strings.Contains(out, "POSTGRES_DB: attendance_db") {
+		t.Error("expected POSTGRES_DB: attendance_db")
+	}
+	if !strings.Contains(out, "pg_isready") {
+		t.Error("expected pg_isready healthcheck")
+	}
+}
+
+func TestGenerateMain_DBHostEnv(t *testing.T) {
+	cfg := &Config{
+		App:      AppConfig{Name: "myapp", Port: 8080},
+		Database: DatabaseConfig{Host: "localhost", Name: "mydb"},
+		Models:   []Model{{Name: "items", Fields: []Field{{Name: "title", Type: "text"}}}},
+	}
+	out := GenerateMain(cfg, "myapp")
+
+	if !strings.Contains(out, `os.Getenv("DB_HOST")`) {
+		t.Error("expected DB_HOST env var reading in generated main.go")
+	}
+}
+
 func min(a, b int) int {
 	if a < b {
 		return a

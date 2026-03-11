@@ -6,7 +6,7 @@ Generate a full-stack web application (database + server + client) from a single
 
 | Layer    | Technology        |
 |----------|-------------------|
-| Database | MySQL             |
+| Database | PostgreSQL        |
 | Server   | Go + Gin + GORM   |
 | Client   | React             |
 | Auth     | JWT               |
@@ -56,7 +56,7 @@ generated/
 
 ## Features
 
-- **Database** — MySQL migrations and GORM models
+- **Database** — PostgreSQL migrations and GORM models
 - **Server** — Gin REST API routes, JWT auth middleware
 - **Client** — React pages, components, API bindings
 - **Sync** — re-run `build` after config changes; only diffs are regenerated
