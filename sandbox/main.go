@@ -18,6 +18,9 @@ var mainTmpl string
 //go:embed templates/docker-compose.yml.tmpl
 var dockerComposeTmpl string
 
+//go:embed templates/go.mod.tmpl
+var goModTmpl string
+
 type Config struct {
 	App      AppConfig      `yaml:"app"`
 	Database DatabaseConfig `yaml:"database"`
@@ -426,6 +429,15 @@ func GenerateDockerCompose(cfg *Config) string {
 	return buf.String()
 }
 
+// GenerateGoMod returns go.mod content for the generated app with
+// gin, gorm, and the postgres driver as dependencies.
+func GenerateGoMod(cfg *Config) string {
+	data := struct{ ModuleName string }{ModuleName: cfg.App.Name}
+	var buf strings.Builder
+	template.Must(template.New("go.mod").Parse(goModTmpl)).Execute(&buf, data) //nolint:errcheck
+	return buf.String()
+}
+
 // GenerateGinRoutes returns Go source code with Gin CRUD handlers and a RegisterRoutes
 // function for every model. modelsImport is the full import path of the models package
 // (e.g. "myapp/models").
@@ -652,4 +664,10 @@ func main() {
 		log.Fatalf("write docker-compose.yml: %v", err)
 	}
 	fmt.Println("Generated docker-compose.yml")
+
+	goMod := GenerateGoMod(cfg)
+	if err := os.WriteFile("go.mod", []byte(goMod), 0644); err != nil {
+		log.Fatalf("write go.mod: %v", err)
+	}
+	fmt.Println("Generated go.mod")
 }
