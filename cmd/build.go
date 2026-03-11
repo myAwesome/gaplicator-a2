@@ -76,6 +76,9 @@ var buildCmd = &cobra.Command{
 			{"Generating .env", func() error {
 				return writeFile(filepath.Join(out, ".env"), generator.GenerateEnv(cfg))
 			}},
+			{"Generating dev.sh", func() error {
+				return writeExecutable(filepath.Join(out, "dev.sh"), generator.GenerateDevScript(cfg))
+			}},
 		}
 
 		if err := os.MkdirAll(out, 0755); err != nil {
@@ -96,6 +99,10 @@ var buildCmd = &cobra.Command{
 
 func writeFile(path, content string) error {
 	return os.WriteFile(path, []byte(content), 0644)
+}
+
+func writeExecutable(path, content string) error {
+	return os.WriteFile(path, []byte(content), 0755)
 }
 
 func init() {

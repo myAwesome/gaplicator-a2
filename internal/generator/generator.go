@@ -23,6 +23,9 @@ var goModTmpl string
 //go:embed templates/.env.tmpl
 var envTmpl string
 
+//go:embed templates/dev.sh.tmpl
+var devShTmpl string
+
 type Config struct {
 	App      AppConfig      `yaml:"app"`
 	Database DatabaseConfig `yaml:"database"`
@@ -180,7 +183,7 @@ func GenerateMigrationDown(models []Model) string {
 
 func tableSQL(m Model) string {
 	var sb strings.Builder
-	fmt.Fprintf(&sb, "CREATE TABLE %s (\n", m.Name)
+	fmt.Fprintf(&sb, "CREATE TABLE IF NOT EXISTS %s (\n", m.Name)
 	sb.WriteString("    id SERIAL PRIMARY KEY")
 	for _, f := range m.Fields {
 		sb.WriteString(",\n")
@@ -458,6 +461,25 @@ func GenerateEnv(cfg *Config) string {
 	}
 	var buf strings.Builder
 	template.Must(template.New(".env").Parse(envTmpl)).Execute(&buf, data) //nolint:errcheck
+	return buf.String()
+}
+
+func GenerateDevScript(cfg *Config) string {
+	data := struct {
+		DBUser     string
+		DBPassword string
+		DBName     string
+		DBPort     int
+		Port       int
+	}{
+		DBUser:     cfg.Database.User,
+		DBPassword: cfg.Database.Password,
+		DBName:     cfg.Database.Name,
+		DBPort:     cfg.Database.Port,
+		Port:       cfg.App.Port,
+	}
+	var buf strings.Builder
+	template.Must(template.New("dev.sh").Parse(devShTmpl)).Execute(&buf, data) //nolint:errcheck
 	return buf.String()
 }
 

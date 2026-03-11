@@ -1,0 +1,37 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Load .env if present
+if [ -f .env ]; then
+  set -a && source .env && set +a
+fi
+
+DB_USER="${DB_USER:-{{.DBUser}}}"
+DB_PASSWORD="${DB_PASSWORD:-{{.DBPassword}}}"
+DB_NAME="${DB_NAME:-{{.DBName}}}"
+DB_PORT="${DB_PORT:-{{.DBPort}}}"
+
+# ── 1. Database ────────────────────────────────────────────────────────────────
+echo "▸ Starting database..."
+docker compose up -d postgres
+
+echo -n "▸ Waiting for database to be ready..."
+until docker compose exec -T postgres pg_isready -U "$DB_USER" -d "$DB_NAME" >/dev/null 2>&1; do
+  printf "."
+  sleep 1
+done
+echo " ready"
+
+# ── 2. Migrations ──────────────────────────────────────────────────────────────
+echo "▸ Applying migrations..."
+PGPASSWORD="$DB_PASSWORD" psql \
+  -h localhost \
+  -p "$DB_PORT" \
+  -U "$DB_USER" \
+  -d "$DB_NAME" \
+  -f migrations/001_initial.up.sql
+echo "  migrations applied"
+
+# ── 3. Server ──────────────────────────────────────────────────────────────────
+echo "▸ Starting server on port {{.Port}}..."
+go run .
