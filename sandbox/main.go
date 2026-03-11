@@ -373,6 +373,126 @@ func GenerateGORMModels(models []Model, pkgName string) string {
 	return sb.String()
 }
 
+// GenerateGinRoutes returns Go source code with Gin CRUD handlers and a RegisterRoutes
+// function for every model. modelsImport is the full import path of the models package
+// (e.g. "myapp/models").
+func GenerateGinRoutes(models []Model, pkgName string, modelsImport string) string {
+	modPkg := modelsImport
+	if idx := strings.LastIndex(modelsImport, "/"); idx >= 0 {
+		modPkg = modelsImport[idx+1:]
+	}
+
+	var sb strings.Builder
+	fmt.Fprintf(&sb, "package %s\n\n", pkgName)
+	sb.WriteString("import (\n")
+	sb.WriteString("\t\"net/http\"\n")
+	sb.WriteString("\t\"strconv\"\n\n")
+	sb.WriteString("\t\"github.com/gin-gonic/gin\"\n")
+	sb.WriteString("\t\"gorm.io/gorm\"\n")
+	fmt.Fprintf(&sb, "\t%q\n", modelsImport)
+	sb.WriteString(")\n\n")
+
+	sb.WriteString("// RegisterRoutes wires all CRUD routes onto r.\n")
+	sb.WriteString("func RegisterRoutes(r *gin.Engine, db *gorm.DB) {\n")
+	for _, m := range models {
+		base := "/" + m.Name
+		s := toPascalCase(toSingular(m.Name))
+		fmt.Fprintf(&sb, "\tr.GET(%q, list%s(db))\n", base, s)
+		fmt.Fprintf(&sb, "\tr.GET(%q, get%s(db))\n", base+"/:id", s)
+		fmt.Fprintf(&sb, "\tr.POST(%q, create%s(db))\n", base, s)
+		fmt.Fprintf(&sb, "\tr.PUT(%q, update%s(db))\n", base+"/:id", s)
+		fmt.Fprintf(&sb, "\tr.DELETE(%q, delete%s(db))\n", base+"/:id", s)
+	}
+	sb.WriteString("}\n")
+
+	for _, m := range models {
+		s := toPascalCase(toSingular(m.Name))
+		typ := modPkg + "." + s
+
+		fmt.Fprintf(&sb, `
+func list%[1]s(db *gorm.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var rows []%[2]s
+		if err := db.Find(&rows).Error; err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, rows)
+	}
+}
+
+func get%[1]s(db *gorm.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		id, err := strconv.Atoi(c.Param("id"))
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
+			return
+		}
+		var row %[2]s
+		if err := db.First(&row, id).Error; err != nil {
+			c.JSON(http.StatusNotFound, gin.H{"error": "not found"})
+			return
+		}
+		c.JSON(http.StatusOK, row)
+	}
+}
+
+func create%[1]s(db *gorm.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var row %[2]s
+		if err := c.ShouldBindJSON(&row); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		if err := db.Create(&row).Error; err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusCreated, row)
+	}
+}
+
+func update%[1]s(db *gorm.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		id, err := strconv.Atoi(c.Param("id"))
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
+			return
+		}
+		var row %[2]s
+		if err := db.First(&row, id).Error; err != nil {
+			c.JSON(http.StatusNotFound, gin.H{"error": "not found"})
+			return
+		}
+		if err := c.ShouldBindJSON(&row); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		db.Save(&row)
+		c.JSON(http.StatusOK, row)
+	}
+}
+
+func delete%[1]s(db *gorm.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		id, err := strconv.Atoi(c.Param("id"))
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
+			return
+		}
+		if err := db.Delete(&%[2]s{}, id).Error; err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		c.Status(http.StatusNoContent)
+	}
+}
+`, s, typ)
+	}
+
+	return sb.String()
+}
+
 func ParseConfig(path string) (*Config, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -458,4 +578,13 @@ func main() {
 		log.Fatalf("write models/models.go: %v", err)
 	}
 	fmt.Println("Generated models/models.go")
+
+	if err := os.MkdirAll("routes", 0755); err != nil {
+		log.Fatalf("create routes dir: %v", err)
+	}
+	ginRoutes := GenerateGinRoutes(cfg.Models, "routes", cfg.App.Name+"/models")
+	if err := os.WriteFile("routes/routes.go", []byte(ginRoutes), 0644); err != nil {
+		log.Fatalf("write routes/routes.go: %v", err)
+	}
+	fmt.Println("Generated routes/routes.go")
 }
