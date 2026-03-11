@@ -20,6 +20,9 @@ var dockerComposeTmpl string
 //go:embed templates/go.mod.tmpl
 var goModTmpl string
 
+//go:embed templates/.env.tmpl
+var envTmpl string
+
 type Config struct {
 	App      AppConfig      `yaml:"app"`
 	Database DatabaseConfig `yaml:"database"`
@@ -32,8 +35,11 @@ type AppConfig struct {
 }
 
 type DatabaseConfig struct {
-	Host string `yaml:"host"`
-	Name string `yaml:"name"`
+	Host     string `yaml:"host"`
+	Port     int    `yaml:"port"`
+	Name     string `yaml:"name"`
+	User     string `yaml:"user"`
+	Password string `yaml:"password"`
 }
 
 type Model struct {
@@ -64,6 +70,16 @@ func ParseConfig(path string) (*Config, error) {
 	var cfg Config
 	if err := yaml.Unmarshal(data, &cfg); err != nil {
 		return nil, fmt.Errorf("parse yaml: %w", err)
+	}
+
+	if cfg.Database.Port == 0 {
+		cfg.Database.Port = 5432
+	}
+	if cfg.Database.User == "" {
+		cfg.Database.User = "postgres"
+	}
+	if cfg.Database.Password == "" {
+		cfg.Database.Password = "secret"
 	}
 
 	return &cfg, nil
@@ -423,6 +439,25 @@ func GenerateGoMod(cfg *Config) string {
 	data := struct{ ModuleName string }{ModuleName: cfg.App.Name}
 	var buf strings.Builder
 	template.Must(template.New("go.mod").Parse(goModTmpl)).Execute(&buf, data) //nolint:errcheck
+	return buf.String()
+}
+
+func GenerateEnv(cfg *Config) string {
+	data := struct {
+		DBHost     string
+		DBPort     int
+		DBUser     string
+		DBPassword string
+		DBName     string
+	}{
+		DBHost:     cfg.Database.Host,
+		DBPort:     cfg.Database.Port,
+		DBUser:     cfg.Database.User,
+		DBPassword: cfg.Database.Password,
+		DBName:     cfg.Database.Name,
+	}
+	var buf strings.Builder
+	template.Must(template.New(".env").Parse(envTmpl)).Execute(&buf, data) //nolint:errcheck
 	return buf.String()
 }
 
