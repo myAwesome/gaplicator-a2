@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"regexp"
+	"strings"
 
 	"gopkg.in/yaml.v3"
 )
@@ -38,6 +40,82 @@ type Field struct {
 	References string `yaml:"references"` // e.g. "subjects.id"
 }
 
+var validTypeRe = regexp.MustCompile(
+	`^(int|bigint|smallint|text|boolean|bool|date|datetime|timestamp|uuid|float|double|` +
+		`varchar\(\d+\)|char\(\d+\)|decimal\(\d+,\s*\d+\))$`,
+)
+
+func ValidateConfig(cfg *Config) []error {
+	var errs []error
+
+	// Required top-level fields
+	if cfg.App.Name == "" {
+		errs = append(errs, fmt.Errorf("app.name is required"))
+	}
+	if cfg.App.Port == 0 {
+		errs = append(errs, fmt.Errorf("app.port is required"))
+	}
+	if cfg.Database.Host == "" {
+		errs = append(errs, fmt.Errorf("database.host is required"))
+	}
+	if cfg.Database.Name == "" {
+		errs = append(errs, fmt.Errorf("database.name is required"))
+	}
+	if len(cfg.Models) == 0 {
+		errs = append(errs, fmt.Errorf("at least one model is required"))
+	}
+
+	// Build model name set for reference validation
+	modelNames := make(map[string]bool, len(cfg.Models))
+	for _, m := range cfg.Models {
+		if m.Name != "" {
+			modelNames[m.Name] = true
+		}
+	}
+
+	for mi, m := range cfg.Models {
+		prefix := fmt.Sprintf("models[%d]", mi)
+		if m.Name == "" {
+			errs = append(errs, fmt.Errorf("%s.name is required", prefix))
+			prefix = fmt.Sprintf("models[%d]", mi) // keep index-based prefix
+		} else {
+			prefix = fmt.Sprintf("model %q", m.Name)
+		}
+
+		if len(m.Fields) == 0 {
+			errs = append(errs, fmt.Errorf("%s: at least one field is required", prefix))
+		}
+
+		for fi, f := range m.Fields {
+			fprefix := fmt.Sprintf("%s field[%d]", prefix, fi)
+			if f.Name != "" {
+				fprefix = fmt.Sprintf("%s field %q", prefix, f.Name)
+			}
+
+			if f.Name == "" {
+				errs = append(errs, fmt.Errorf("%s: name is required", fprefix))
+			}
+
+			if f.Type == "" {
+				errs = append(errs, fmt.Errorf("%s: type is required", fprefix))
+			} else if !validTypeRe.MatchString(strings.ToLower(f.Type)) {
+				errs = append(errs, fmt.Errorf("%s: unknown type %q", fprefix, f.Type))
+			}
+
+			if f.References != "" {
+				parts := strings.SplitN(f.References, ".", 2)
+				if len(parts) != 2 || parts[0] == "" || parts[1] == "" {
+					errs = append(errs, fmt.Errorf("%s: references %q must be in \"model.field\" format", fprefix, f.References))
+				} else if !modelNames[parts[0]] {
+					errs = append(errs, fmt.Errorf("%s: references unknown model %q", fprefix, parts[0]))
+				}
+			}
+		}
+	}
+
+	return errs
+}
+
 func ParseConfig(path string) (*Config, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -60,6 +138,14 @@ func main() {
 	cfg, err := ParseConfig(os.Args[1])
 	if err != nil {
 		log.Fatalf("error: %v", err)
+	}
+
+	if errs := ValidateConfig(cfg); len(errs) > 0 {
+		fmt.Fprintf(os.Stderr, "config validation failed (%d error(s)):\n", len(errs))
+		for _, e := range errs {
+			fmt.Fprintf(os.Stderr, "  - %v\n", e)
+		}
+		os.Exit(1)
 	}
 
 	fmt.Printf("App: %s (port %d)\n", cfg.App.Name, cfg.App.Port)
