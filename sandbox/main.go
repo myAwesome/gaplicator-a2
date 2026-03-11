@@ -1,14 +1,19 @@
 package main
 
 import (
+	_ "embed"
 	"fmt"
 	"log"
 	"os"
 	"regexp"
 	"strings"
+	"text/template"
 
 	"gopkg.in/yaml.v3"
 )
+
+//go:embed templates/main.go.tmpl
+var mainTmpl string
 
 type Config struct {
 	App      AppConfig      `yaml:"app"`
@@ -373,6 +378,36 @@ func GenerateGORMModels(models []Model, pkgName string) string {
 	return sb.String()
 }
 
+// GenerateMain returns Go source code for the generated web app's main.go.
+// It wires a GORM PostgreSQL connection and the Gin router together.
+// appImport is the module path of the generated app (e.g. "attendance-journal").
+func GenerateMain(cfg *Config, appImport string) string {
+	models := make([]string, len(cfg.Models))
+	for i, m := range cfg.Models {
+		models[i] = toPascalCase(toSingular(m.Name))
+	}
+
+	data := struct {
+		ModelsImport string
+		RoutesImport string
+		DBHost       string
+		DBName       string
+		Port         int
+		Models       []string
+	}{
+		ModelsImport: fmt.Sprintf("%q", appImport+"/models"),
+		RoutesImport: fmt.Sprintf("%q", appImport+"/routes"),
+		DBHost:       fmt.Sprintf("%q", cfg.Database.Host),
+		DBName:       fmt.Sprintf("%q", cfg.Database.Name),
+		Port:         cfg.App.Port,
+		Models:       models,
+	}
+
+	var buf strings.Builder
+	template.Must(template.New("main").Parse(mainTmpl)).Execute(&buf, data) //nolint:errcheck
+	return buf.String()
+}
+
 // GenerateGinRoutes returns Go source code with Gin CRUD handlers and a RegisterRoutes
 // function for every model. modelsImport is the full import path of the models package
 // (e.g. "myapp/models").
@@ -587,4 +622,10 @@ func main() {
 		log.Fatalf("write routes/routes.go: %v", err)
 	}
 	fmt.Println("Generated routes/routes.go")
+
+	mainSrc := GenerateMain(cfg, cfg.App.Name)
+	if err := os.WriteFile("main.go", []byte(mainSrc), 0644); err != nil {
+		log.Fatalf("write main.go: %v", err)
+	}
+	fmt.Println("Generated main.go")
 }

@@ -1,0 +1,46 @@
+package main
+
+import (
+	"fmt"
+	"log"
+	"os"
+
+	"github.com/gin-gonic/gin"
+	"gorm.io/driver/postgres"
+	"gorm.io/gorm"
+
+	{{.ModelsImport}}
+	{{.RoutesImport}}
+)
+
+func main() {
+	dbPort := os.Getenv("DB_PORT")
+	if dbPort == "" {
+		dbPort = "5432"
+	}
+
+	dsn := fmt.Sprintf(
+		"host=%s user=%s password=%s dbname=%s port=%s sslmode=disable",
+		{{.DBHost}}, os.Getenv("DB_USER"), os.Getenv("DB_PASSWORD"), {{.DBName}}, dbPort,
+	)
+
+	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
+	if err != nil {
+		log.Fatalf("connect db: %v", err)
+	}
+
+	if err := db.AutoMigrate(
+{{- range .Models}}
+		&models.{{.}}{},
+{{- end}}
+	); err != nil {
+		log.Fatalf("automigrate: %v", err)
+	}
+
+	r := gin.Default()
+	routes.RegisterRoutes(r, db)
+
+	if err := r.Run(":{{.Port}}"); err != nil {
+		log.Fatalf("server: %v", err)
+	}
+}

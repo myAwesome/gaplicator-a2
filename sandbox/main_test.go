@@ -138,6 +138,104 @@ func TestGenerateGinRoutes_SingularRouteNames(t *testing.T) {
 	}
 }
 
+func TestGenerateMain_PackageAndImports(t *testing.T) {
+	cfg := &Config{
+		App:      AppConfig{Name: "myapp", Port: 8080},
+		Database: DatabaseConfig{Host: "localhost", Name: "mydb"},
+		Models:   []Model{{Name: "users", Fields: []Field{{Name: "name", Type: "text"}}}},
+	}
+	out := GenerateMain(cfg, "myapp")
+
+	for _, want := range []string{
+		"package main",
+		`"github.com/gin-gonic/gin"`,
+		`"gorm.io/driver/postgres"`,
+		`"gorm.io/gorm"`,
+		`"myapp/models"`,
+		`"myapp/routes"`,
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("missing: %s", want)
+		}
+	}
+}
+
+func TestGenerateMain_DBConnection(t *testing.T) {
+	cfg := &Config{
+		App:      AppConfig{Name: "myapp", Port: 8080},
+		Database: DatabaseConfig{Host: "db.example.com", Name: "prod_db"},
+		Models:   []Model{{Name: "items", Fields: []Field{{Name: "title", Type: "text"}}}},
+	}
+	out := GenerateMain(cfg, "myapp")
+
+	for _, want := range []string{
+		`"db.example.com"`,
+		`"prod_db"`,
+		`os.Getenv("DB_USER")`,
+		`os.Getenv("DB_PASSWORD")`,
+		`os.Getenv("DB_PORT")`,
+		`gorm.Open(postgres.Open(dsn)`,
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("missing: %s", want)
+		}
+	}
+}
+
+func TestGenerateMain_DBPortDefault(t *testing.T) {
+	cfg := &Config{
+		App:      AppConfig{Name: "myapp", Port: 8080},
+		Database: DatabaseConfig{Host: "localhost", Name: "mydb"},
+		Models:   []Model{{Name: "items", Fields: []Field{{Name: "title", Type: "text"}}}},
+	}
+	out := GenerateMain(cfg, "myapp")
+
+	if !strings.Contains(out, `dbPort = "5432"`) {
+		t.Error("expected default DB_PORT fallback to 5432")
+	}
+}
+
+func TestGenerateMain_AutoMigrate(t *testing.T) {
+	cfg := &Config{
+		App:      AppConfig{Name: "myapp", Port: 8080},
+		Database: DatabaseConfig{Host: "localhost", Name: "mydb"},
+		Models: []Model{
+			{Name: "users", Fields: []Field{{Name: "name", Type: "text"}}},
+			{Name: "posts", Fields: []Field{{Name: "title", Type: "text"}}},
+		},
+	}
+	out := GenerateMain(cfg, "myapp")
+
+	for _, want := range []string{
+		"db.AutoMigrate(",
+		"&models.User{}",
+		"&models.Post{}",
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("missing: %s", want)
+		}
+	}
+}
+
+func TestGenerateMain_RouterAndServer(t *testing.T) {
+	cfg := &Config{
+		App:      AppConfig{Name: "myapp", Port: 3000},
+		Database: DatabaseConfig{Host: "localhost", Name: "mydb"},
+		Models:   []Model{{Name: "items", Fields: []Field{{Name: "name", Type: "text"}}}},
+	}
+	out := GenerateMain(cfg, "myapp")
+
+	for _, want := range []string{
+		"gin.Default()",
+		"routes.RegisterRoutes(r, db)",
+		`r.Run(":3000")`,
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("missing: %s", want)
+		}
+	}
+}
+
 func min(a, b int) int {
 	if a < b {
 		return a
