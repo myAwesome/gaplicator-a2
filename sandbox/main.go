@@ -1,6 +1,7 @@
 package main
 
 import (
+	_ "embed"
 	"fmt"
 	"log"
 	"os"
@@ -10,6 +11,9 @@ import (
 
 	"gopkg.in/yaml.v3"
 )
+
+//go:embed templates/main.go.tmpl
+var mainTmpl string
 
 type Config struct {
 	App      AppConfig      `yaml:"app"`
@@ -378,53 +382,6 @@ func GenerateGORMModels(models []Model, pkgName string) string {
 // It wires a GORM PostgreSQL connection and the Gin router together.
 // appImport is the module path of the generated app (e.g. "attendance-journal").
 func GenerateMain(cfg *Config, appImport string) string {
-	const tmpl = `package main
-
-import (
-	"fmt"
-	"log"
-	"os"
-
-	"github.com/gin-gonic/gin"
-	"gorm.io/driver/postgres"
-	"gorm.io/gorm"
-
-	{{.ModelsImport}}
-	{{.RoutesImport}}
-)
-
-func main() {
-	dbPort := os.Getenv("DB_PORT")
-	if dbPort == "" {
-		dbPort = "5432"
-	}
-
-	dsn := fmt.Sprintf(
-		"host=%s user=%s password=%s dbname=%s port=%s sslmode=disable",
-		{{.DBHost}}, os.Getenv("DB_USER"), os.Getenv("DB_PASSWORD"), {{.DBName}}, dbPort,
-	)
-
-	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
-	if err != nil {
-		log.Fatalf("connect db: %v", err)
-	}
-
-	if err := db.AutoMigrate(
-{{- range .Models}}
-		&models.{{.}}{},
-{{- end}}
-	); err != nil {
-		log.Fatalf("automigrate: %v", err)
-	}
-
-	r := gin.Default()
-	routes.RegisterRoutes(r, db)
-
-	if err := r.Run(":{{.Port}}"); err != nil {
-		log.Fatalf("server: %v", err)
-	}
-}
-`
 	models := make([]string, len(cfg.Models))
 	for i, m := range cfg.Models {
 		models[i] = toPascalCase(toSingular(m.Name))
@@ -447,7 +404,7 @@ func main() {
 	}
 
 	var buf strings.Builder
-	template.Must(template.New("main").Parse(tmpl)).Execute(&buf, data) //nolint:errcheck
+	template.Must(template.New("main").Parse(mainTmpl)).Execute(&buf, data) //nolint:errcheck
 	return buf.String()
 }
 
