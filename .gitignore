@@ -1,3 +1,4 @@
 sandbox/web-app-gen
 sandbox/schema.sql
 sandbox/migrations/
+sandbox/routes/
