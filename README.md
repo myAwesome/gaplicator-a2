@@ -57,6 +57,8 @@ dist/
 ├── main.go                        # Gin server + GORM auto-migrate
 ├── go.mod                         # module with gin/gorm/postgres deps
 ├── docker-compose.yml             # app + postgres services
+├── .env                           # DB credentials
+├── dev.sh                         # one-command dev startup (see below)
 ├── schema.sql                     # CREATE TABLE statements
 ├── migrations/
 │   ├── 001_initial.up.sql
@@ -76,9 +78,16 @@ go install github.com/myAwesome/vibe-gen@latest
 # scaffold from config
 gapp build app.yaml
 
-# start generated app
-cd dist && docker-compose up
+# start generated app (DB + migrations + server in one command)
+cd dist && ./dev.sh
 ```
+
+`dev.sh` does three things in order:
+1. Starts the PostgreSQL container via `docker compose up -d postgres`
+2. Waits for the database to be healthy, then applies `migrations/001_initial.up.sql`
+3. Starts the Go server with `go run .`
+
+No local PostgreSQL client required — migrations run inside the container.
 
 ## Config reference
 
