@@ -62,6 +62,8 @@ type Field struct {
 	References string `yaml:"references"`
 }
 
+var validIdentRe = regexp.MustCompile(`^[a-z][a-z0-9_]*$`)
+
 var validTypeRe = regexp.MustCompile(
 	`^(int|bigint|smallint|text|boolean|bool|date|datetime|timestamp|uuid|float|double|` +
 		`varchar\(\d+\)|char\(\d+\)|decimal\(\d+,\s*\d+\))$`,
@@ -121,6 +123,9 @@ func ValidateConfig(cfg *Config) []error {
 		prefix := fmt.Sprintf("models[%d]", mi)
 		if m.Name == "" {
 			errs = append(errs, fmt.Errorf("%s.name is required", prefix))
+		} else if !validIdentRe.MatchString(m.Name) {
+			errs = append(errs, fmt.Errorf("model %q: name must be lowercase snake_case (a-z, 0-9, _)", m.Name))
+			prefix = fmt.Sprintf("model %q", m.Name)
 		} else {
 			prefix = fmt.Sprintf("model %q", m.Name)
 		}
@@ -137,6 +142,8 @@ func ValidateConfig(cfg *Config) []error {
 
 			if f.Name == "" {
 				errs = append(errs, fmt.Errorf("%s: name is required", fprefix))
+			} else if !validIdentRe.MatchString(f.Name) {
+				errs = append(errs, fmt.Errorf("%s: name must be lowercase snake_case (a-z, 0-9, _)", fprefix))
 			}
 
 			if f.Type == "" {
@@ -149,6 +156,8 @@ func ValidateConfig(cfg *Config) []error {
 				parts := strings.SplitN(f.References, ".", 2)
 				if len(parts) != 2 || parts[0] == "" || parts[1] == "" {
 					errs = append(errs, fmt.Errorf("%s: references %q must be in \"model.field\" format", fprefix, f.References))
+				} else if !validIdentRe.MatchString(parts[0]) || !validIdentRe.MatchString(parts[1]) {
+					errs = append(errs, fmt.Errorf("%s: references %q identifiers must be lowercase snake_case", fprefix, f.References))
 				} else if !modelNames[parts[0]] {
 					errs = append(errs, fmt.Errorf("%s: references unknown model %q", fprefix, parts[0]))
 				}
@@ -217,7 +226,7 @@ func formatDefault(v any) string {
 		}
 		return "FALSE"
 	case string:
-		return fmt.Sprintf("'%s'", val)
+		return "'" + strings.ReplaceAll(val, "'", "''") + "'"
 	default:
 		return fmt.Sprintf("%v", val)
 	}
@@ -401,7 +410,7 @@ func GenerateGORMModels(models []Model, pkgName string) string {
 	return sb.String()
 }
 
-func GenerateMain(cfg *Config, appImport string) string {
+func GenerateMain(cfg *Config, appImport string) (string, error) {
 	models := make([]string, len(cfg.Models))
 	for i, m := range cfg.Models {
 		models[i] = toPascalCase(toSingular(m.Name))
@@ -424,11 +433,13 @@ func GenerateMain(cfg *Config, appImport string) string {
 	}
 
 	var buf strings.Builder
-	template.Must(template.New("main").Parse(mainTmpl)).Execute(&buf, data) //nolint:errcheck
-	return buf.String()
+	if err := template.Must(template.New("main").Parse(mainTmpl)).Execute(&buf, data); err != nil {
+		return "", fmt.Errorf("execute main template: %w", err)
+	}
+	return buf.String(), nil
 }
 
-func GenerateDockerCompose(cfg *Config) string {
+func GenerateDockerCompose(cfg *Config) (string, error) {
 	data := struct {
 		Port   int
 		DBName string
@@ -437,18 +448,22 @@ func GenerateDockerCompose(cfg *Config) string {
 		DBName: cfg.Database.Name,
 	}
 	var buf strings.Builder
-	template.Must(template.New("docker-compose").Parse(dockerComposeTmpl)).Execute(&buf, data) //nolint:errcheck
-	return buf.String()
+	if err := template.Must(template.New("docker-compose").Parse(dockerComposeTmpl)).Execute(&buf, data); err != nil {
+		return "", fmt.Errorf("execute docker-compose template: %w", err)
+	}
+	return buf.String(), nil
 }
 
-func GenerateGoMod(cfg *Config) string {
+func GenerateGoMod(cfg *Config) (string, error) {
 	data := struct{ ModuleName string }{ModuleName: cfg.App.Name}
 	var buf strings.Builder
-	template.Must(template.New("go.mod").Parse(goModTmpl)).Execute(&buf, data) //nolint:errcheck
-	return buf.String()
+	if err := template.Must(template.New("go.mod").Parse(goModTmpl)).Execute(&buf, data); err != nil {
+		return "", fmt.Errorf("execute go.mod template: %w", err)
+	}
+	return buf.String(), nil
 }
 
-func GenerateEnv(cfg *Config) string {
+func GenerateEnv(cfg *Config) (string, error) {
 	data := struct {
 		DBHost     string
 		DBPort     int
@@ -463,11 +478,13 @@ func GenerateEnv(cfg *Config) string {
 		DBName:     cfg.Database.Name,
 	}
 	var buf strings.Builder
-	template.Must(template.New(".env").Parse(envTmpl)).Execute(&buf, data) //nolint:errcheck
-	return buf.String()
+	if err := template.Must(template.New(".env").Parse(envTmpl)).Execute(&buf, data); err != nil {
+		return "", fmt.Errorf("execute .env template: %w", err)
+	}
+	return buf.String(), nil
 }
 
-func GenerateDevScript(cfg *Config) string {
+func GenerateDevScript(cfg *Config) (string, error) {
 	data := struct {
 		DBUser     string
 		DBPassword string
@@ -482,14 +499,18 @@ func GenerateDevScript(cfg *Config) string {
 		Port:       cfg.App.Port,
 	}
 	var buf strings.Builder
-	template.Must(template.New("dev.sh").Parse(devShTmpl)).Execute(&buf, data) //nolint:errcheck
-	return buf.String()
+	if err := template.Must(template.New("dev.sh").Parse(devShTmpl)).Execute(&buf, data); err != nil {
+		return "", fmt.Errorf("execute dev.sh template: %w", err)
+	}
+	return buf.String(), nil
 }
 
-func GenerateShutdownScript() string {
+func GenerateShutdownScript() (string, error) {
 	var buf strings.Builder
-	template.Must(template.New("shutdown.sh").Parse(shutdownShTmpl)).Execute(&buf, nil) //nolint:errcheck
-	return buf.String()
+	if err := template.Must(template.New("shutdown.sh").Parse(shutdownShTmpl)).Execute(&buf, nil); err != nil {
+		return "", fmt.Errorf("execute shutdown.sh template: %w", err)
+	}
+	return buf.String(), nil
 }
 
 func GenerateGinRoutes(models []Model, pkgName string, modelsImport string) string {

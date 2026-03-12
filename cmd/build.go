@@ -65,22 +65,46 @@ var buildCmd = &cobra.Command{
 				return writeFile(filepath.Join(dir, "routes.go"), generator.GenerateGinRoutes(cfg.Models, "routes", cfg.App.Name+"/models"))
 			}},
 			{"Generating main.go", func() error {
-				return writeFile(filepath.Join(out, "main.go"), generator.GenerateMain(cfg, cfg.App.Name))
+				content, err := generator.GenerateMain(cfg, cfg.App.Name)
+				if err != nil {
+					return err
+				}
+				return writeFile(filepath.Join(out, "main.go"), content)
 			}},
 			{"Generating docker-compose.yml", func() error {
-				return writeFile(filepath.Join(out, "docker-compose.yml"), generator.GenerateDockerCompose(cfg))
+				content, err := generator.GenerateDockerCompose(cfg)
+				if err != nil {
+					return err
+				}
+				return writeFile(filepath.Join(out, "docker-compose.yml"), content)
 			}},
 			{"Generating go.mod", func() error {
-				return writeFile(filepath.Join(out, "go.mod"), generator.GenerateGoMod(cfg))
+				content, err := generator.GenerateGoMod(cfg)
+				if err != nil {
+					return err
+				}
+				return writeFile(filepath.Join(out, "go.mod"), content)
 			}},
 			{"Generating .env", func() error {
-				return writeFile(filepath.Join(out, ".env"), generator.GenerateEnv(cfg))
+				content, err := generator.GenerateEnv(cfg)
+				if err != nil {
+					return err
+				}
+				return writeFile(filepath.Join(out, ".env"), content)
 			}},
 			{"Generating dev.sh", func() error {
-				return writeExecutable(filepath.Join(out, "dev.sh"), generator.GenerateDevScript(cfg))
+				content, err := generator.GenerateDevScript(cfg)
+				if err != nil {
+					return err
+				}
+				return writeExecutable(filepath.Join(out, "dev.sh"), content)
 			}},
 			{"Generating shutdown.sh", func() error {
-				return writeExecutable(filepath.Join(out, "shutdown.sh"), generator.GenerateShutdownScript())
+				content, err := generator.GenerateShutdownScript()
+				if err != nil {
+					return err
+				}
+				return writeExecutable(filepath.Join(out, "shutdown.sh"), content)
 			}},
 			{"Generating client", func() error {
 				clientDir := filepath.Join(out, "client")
