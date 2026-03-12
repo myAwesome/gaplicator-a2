@@ -15,6 +15,11 @@ func ModelFileBasename(m Model) string {
 	return toSingular(m.Name)
 }
 
+// isDateType returns true if the SQL type is a date-only type (needs YYYY-MM-DD ↔ RFC3339 conversion).
+func isDateType(sqlType string) bool {
+	return strings.ToLower(sqlType) == "date"
+}
+
 // sqlTypeToTS maps a SQL type to the corresponding TypeScript type.
 func sqlTypeToTS(sqlType string) string {
 	lower := strings.ToLower(sqlType)
@@ -322,7 +327,9 @@ func GenerateReactPage(m Model) string {
 	sb.WriteString("    setEditing(item);\n")
 	sb.WriteString("    setForm({\n")
 	for _, f := range m.Fields {
-		if f.Required {
+		if isDateType(f.Type) {
+			fmt.Fprintf(&sb, "      %s: item.%s ? (item.%s as string).slice(0, 10) : '',\n", f.Name, f.Name, f.Name)
+		} else if f.Required {
 			fmt.Fprintf(&sb, "      %s: item.%s,\n", f.Name, f.Name)
 		} else {
 			fmt.Fprintf(&sb, "      %s: item.%s ?? %s,\n", f.Name, f.Name, tsInputDefault(f.Type))
@@ -335,8 +342,26 @@ func GenerateReactPage(m Model) string {
 	sb.WriteString("  async function handleSubmit(e: React.FormEvent) {\n")
 	sb.WriteString("    e.preventDefault();\n")
 	sb.WriteString("    try {\n")
-	fmt.Fprintf(&sb, "      if (editing) await update%s(editing.id, form);\n", structName)
-	fmt.Fprintf(&sb, "      else await create%s(form);\n", structName)
+	// Collect date fields that need YYYY-MM-DD → RFC3339 conversion
+	var dateFields []Field
+	for _, f := range m.Fields {
+		if isDateType(f.Type) {
+			dateFields = append(dateFields, f)
+		}
+	}
+	if len(dateFields) > 0 {
+		sb.WriteString("      const payload = {\n")
+		sb.WriteString("        ...form,\n")
+		for _, f := range dateFields {
+			fmt.Fprintf(&sb, "        %s: form.%s ? form.%s + 'T00:00:00Z' : form.%s,\n", f.Name, f.Name, f.Name, f.Name)
+		}
+		sb.WriteString("      };\n")
+		fmt.Fprintf(&sb, "      if (editing) await update%s(editing.id, payload);\n", structName)
+		fmt.Fprintf(&sb, "      else await create%s(payload);\n", structName)
+	} else {
+		fmt.Fprintf(&sb, "      if (editing) await update%s(editing.id, form);\n", structName)
+		fmt.Fprintf(&sb, "      else await create%s(form);\n", structName)
+	}
 	sb.WriteString("      setShowForm(false); load();\n")
 	sb.WriteString("    } catch (e) { console.error(e); }\n")
 	sb.WriteString("  }\n\n")
