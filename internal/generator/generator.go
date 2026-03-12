@@ -26,6 +26,9 @@ var envTmpl string
 //go:embed templates/dev.sh.tmpl
 var devShTmpl string
 
+//go:embed templates/shutdown.sh.tmpl
+var shutdownShTmpl string
+
 type Config struct {
 	App      AppConfig      `yaml:"app"`
 	Database DatabaseConfig `yaml:"database"`
@@ -480,6 +483,12 @@ func GenerateDevScript(cfg *Config) string {
 	}
 	var buf strings.Builder
 	template.Must(template.New("dev.sh").Parse(devShTmpl)).Execute(&buf, data) //nolint:errcheck
+	return buf.String()
+}
+
+func GenerateShutdownScript() string {
+	var buf strings.Builder
+	template.Must(template.New("shutdown.sh").Parse(shutdownShTmpl)).Execute(&buf, nil) //nolint:errcheck
 	return buf.String()
 }
 

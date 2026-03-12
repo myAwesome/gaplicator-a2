@@ -79,6 +79,9 @@ var buildCmd = &cobra.Command{
 			{"Generating dev.sh", func() error {
 				return writeExecutable(filepath.Join(out, "dev.sh"), generator.GenerateDevScript(cfg))
 			}},
+			{"Generating shutdown.sh", func() error {
+				return writeExecutable(filepath.Join(out, "shutdown.sh"), generator.GenerateShutdownScript())
+			}},
 		}
 
 		if err := os.MkdirAll(out, 0755); err != nil {
