@@ -1,4 +1,4 @@
-package main
+package generator
 
 import (
 	"strings"
@@ -144,7 +144,10 @@ func TestGenerateMain_PackageAndImports(t *testing.T) {
 		Database: DatabaseConfig{Host: "localhost", Name: "mydb"},
 		Models:   []Model{{Name: "users", Fields: []Field{{Name: "name", Type: "text"}}}},
 	}
-	out := GenerateMain(cfg, "myapp")
+	out, err := GenerateMain(cfg, "myapp")
+	if err != nil {
+		t.Fatalf("GenerateMain: %v", err)
+	}
 
 	for _, want := range []string{
 		"package main",
@@ -166,7 +169,10 @@ func TestGenerateMain_DBConnection(t *testing.T) {
 		Database: DatabaseConfig{Host: "db.example.com", Name: "prod_db"},
 		Models:   []Model{{Name: "items", Fields: []Field{{Name: "title", Type: "text"}}}},
 	}
-	out := GenerateMain(cfg, "myapp")
+	out, err := GenerateMain(cfg, "myapp")
+	if err != nil {
+		t.Fatalf("GenerateMain: %v", err)
+	}
 
 	for _, want := range []string{
 		`"db.example.com"`,
@@ -188,7 +194,10 @@ func TestGenerateMain_DBPortDefault(t *testing.T) {
 		Database: DatabaseConfig{Host: "localhost", Name: "mydb"},
 		Models:   []Model{{Name: "items", Fields: []Field{{Name: "title", Type: "text"}}}},
 	}
-	out := GenerateMain(cfg, "myapp")
+	out, err := GenerateMain(cfg, "myapp")
+	if err != nil {
+		t.Fatalf("GenerateMain: %v", err)
+	}
 
 	if !strings.Contains(out, `dbPort = "5432"`) {
 		t.Error("expected default DB_PORT fallback to 5432")
@@ -204,7 +213,10 @@ func TestGenerateMain_AutoMigrate(t *testing.T) {
 			{Name: "posts", Fields: []Field{{Name: "title", Type: "text"}}},
 		},
 	}
-	out := GenerateMain(cfg, "myapp")
+	out, err := GenerateMain(cfg, "myapp")
+	if err != nil {
+		t.Fatalf("GenerateMain: %v", err)
+	}
 
 	for _, want := range []string{
 		"db.AutoMigrate(",
@@ -223,7 +235,10 @@ func TestGenerateMain_RouterAndServer(t *testing.T) {
 		Database: DatabaseConfig{Host: "localhost", Name: "mydb"},
 		Models:   []Model{{Name: "items", Fields: []Field{{Name: "name", Type: "text"}}}},
 	}
-	out := GenerateMain(cfg, "myapp")
+	out, err := GenerateMain(cfg, "myapp")
+	if err != nil {
+		t.Fatalf("GenerateMain: %v", err)
+	}
 
 	for _, want := range []string{
 		"gin.Default()",
@@ -242,7 +257,10 @@ func TestGenerateDockerCompose_Services(t *testing.T) {
 		Database: DatabaseConfig{Host: "localhost", Name: "mydb"},
 		Models:   []Model{{Name: "users", Fields: []Field{{Name: "name", Type: "text"}}}},
 	}
-	out := GenerateDockerCompose(cfg)
+	out, err := GenerateDockerCompose(cfg)
+	if err != nil {
+		t.Fatalf("GenerateDockerCompose: %v", err)
+	}
 
 	for _, want := range []string{
 		"services:",
@@ -267,7 +285,10 @@ func TestGenerateDockerCompose_PortAndDBName(t *testing.T) {
 		Database: DatabaseConfig{Host: "localhost", Name: "attendance_db"},
 		Models:   []Model{{Name: "items", Fields: []Field{{Name: "title", Type: "text"}}}},
 	}
-	out := GenerateDockerCompose(cfg)
+	out, err := GenerateDockerCompose(cfg)
+	if err != nil {
+		t.Fatalf("GenerateDockerCompose: %v", err)
+	}
 
 	if !strings.Contains(out, `"3000:3000"`) {
 		t.Error("expected port 3000 in app service")
@@ -286,7 +307,10 @@ func TestGenerateMain_DBHostEnv(t *testing.T) {
 		Database: DatabaseConfig{Host: "localhost", Name: "mydb"},
 		Models:   []Model{{Name: "items", Fields: []Field{{Name: "title", Type: "text"}}}},
 	}
-	out := GenerateMain(cfg, "myapp")
+	out, err := GenerateMain(cfg, "myapp")
+	if err != nil {
+		t.Fatalf("GenerateMain: %v", err)
+	}
 
 	if !strings.Contains(out, `os.Getenv("DB_HOST")`) {
 		t.Error("expected DB_HOST env var reading in generated main.go")
@@ -298,7 +322,10 @@ func TestGenerateGoMod_ModuleAndGo(t *testing.T) {
 		App:      AppConfig{Name: "myapp", Port: 8080},
 		Database: DatabaseConfig{Host: "localhost", Name: "mydb"},
 	}
-	out := GenerateGoMod(cfg)
+	out, err := GenerateGoMod(cfg)
+	if err != nil {
+		t.Fatalf("GenerateGoMod: %v", err)
+	}
 
 	if !strings.HasPrefix(out, "module myapp\n") {
 		t.Errorf("expected 'module myapp' header, got: %q", out[:min(40, len(out))])
@@ -313,7 +340,10 @@ func TestGenerateGoMod_Dependencies(t *testing.T) {
 		App:      AppConfig{Name: "attendance-journal", Port: 3000},
 		Database: DatabaseConfig{Host: "localhost", Name: "mydb"},
 	}
-	out := GenerateGoMod(cfg)
+	out, err := GenerateGoMod(cfg)
+	if err != nil {
+		t.Fatalf("GenerateGoMod: %v", err)
+	}
 
 	for _, want := range []string{
 		"github.com/gin-gonic/gin",
@@ -331,7 +361,10 @@ func TestGenerateGoMod_ModuleName(t *testing.T) {
 		App:      AppConfig{Name: "shop-api", Port: 8080},
 		Database: DatabaseConfig{Host: "localhost", Name: "shopdb"},
 	}
-	out := GenerateGoMod(cfg)
+	out, err := GenerateGoMod(cfg)
+	if err != nil {
+		t.Fatalf("GenerateGoMod: %v", err)
+	}
 
 	if !strings.Contains(out, "module shop-api") {
 		t.Errorf("expected module name 'shop-api', got: %q", out)
@@ -349,7 +382,10 @@ func TestGenerateEnv_AllVars(t *testing.T) {
 			Password: "s3cr3t",
 		},
 	}
-	out := GenerateEnv(cfg)
+	out, err := GenerateEnv(cfg)
+	if err != nil {
+		t.Fatalf("GenerateEnv: %v", err)
+	}
 
 	for _, want := range []string{
 		"DB_HOST=db.example.com",
@@ -369,7 +405,10 @@ func TestGenerateEnv_Defaults(t *testing.T) {
 		App:      AppConfig{Name: "myapp", Port: 8080},
 		Database: DatabaseConfig{Host: "localhost", Port: 5432, Name: "mydb", User: "postgres", Password: "secret"},
 	}
-	out := GenerateEnv(cfg)
+	out, err := GenerateEnv(cfg)
+	if err != nil {
+		t.Fatalf("GenerateEnv: %v", err)
+	}
 
 	if !strings.Contains(out, "DB_PORT=5432") {
 		t.Error("expected DB_PORT=5432")
@@ -680,7 +719,10 @@ func TestGenerateDevScript_ShebangAndSafety(t *testing.T) {
 		Database: DatabaseConfig{Host: "localhost", Name: "mydb", User: "postgres", Password: "secret", Port: 5432},
 		Models:   []Model{{Name: "users", Fields: []Field{{Name: "name", Type: "text"}}}},
 	}
-	out := GenerateDevScript(cfg)
+	out, err := GenerateDevScript(cfg)
+	if err != nil {
+		t.Fatalf("GenerateDevScript: %v", err)
+	}
 
 	for _, want := range []string{
 		"#!/usr/bin/env bash",
@@ -698,7 +740,10 @@ func TestGenerateDevScript_StartsDatabase(t *testing.T) {
 		Database: DatabaseConfig{Host: "localhost", Name: "mydb", User: "dbuser", Password: "secret", Port: 5432},
 		Models:   []Model{{Name: "users", Fields: []Field{{Name: "name", Type: "text"}}}},
 	}
-	out := GenerateDevScript(cfg)
+	out, err := GenerateDevScript(cfg)
+	if err != nil {
+		t.Fatalf("GenerateDevScript: %v", err)
+	}
 
 	for _, want := range []string{
 		"docker compose up -d postgres",
@@ -718,7 +763,10 @@ func TestGenerateDevScript_AppliesMigrations(t *testing.T) {
 		Database: DatabaseConfig{Host: "localhost", Name: "mydb", User: "postgres", Password: "secret", Port: 5432},
 		Models:   []Model{{Name: "users", Fields: []Field{{Name: "name", Type: "text"}}}},
 	}
-	out := GenerateDevScript(cfg)
+	out, err := GenerateDevScript(cfg)
+	if err != nil {
+		t.Fatalf("GenerateDevScript: %v", err)
+	}
 
 	if !strings.Contains(out, "migrations/001_initial.up.sql") {
 		t.Error("expected migration file reference in dev.sh")
@@ -731,7 +779,10 @@ func TestGenerateDevScript_StartsServer(t *testing.T) {
 		Database: DatabaseConfig{Host: "localhost", Name: "mydb", User: "postgres", Password: "secret", Port: 5432},
 		Models:   []Model{{Name: "users", Fields: []Field{{Name: "name", Type: "text"}}}},
 	}
-	out := GenerateDevScript(cfg)
+	out, err := GenerateDevScript(cfg)
+	if err != nil {
+		t.Fatalf("GenerateDevScript: %v", err)
+	}
 
 	for _, want := range []string{
 		"go run .",
@@ -749,7 +800,10 @@ func TestGenerateDevScript_StartsClient(t *testing.T) {
 		Database: DatabaseConfig{Host: "localhost", Name: "mydb", User: "postgres", Password: "secret", Port: 5432},
 		Models:   []Model{{Name: "users", Fields: []Field{{Name: "name", Type: "text"}}}},
 	}
-	out := GenerateDevScript(cfg)
+	out, err := GenerateDevScript(cfg)
+	if err != nil {
+		t.Fatalf("GenerateDevScript: %v", err)
+	}
 
 	for _, want := range []string{
 		"npm install",
@@ -768,7 +822,10 @@ func TestGenerateDevScript_BackgroundProcesses(t *testing.T) {
 		Database: DatabaseConfig{Host: "localhost", Name: "mydb", User: "postgres", Password: "secret", Port: 5432},
 		Models:   []Model{{Name: "users", Fields: []Field{{Name: "name", Type: "text"}}}},
 	}
-	out := GenerateDevScript(cfg)
+	out, err := GenerateDevScript(cfg)
+	if err != nil {
+		t.Fatalf("GenerateDevScript: %v", err)
+	}
 
 	// Server runs in background so client can also start
 	if !strings.Contains(out, "go run . &") {
@@ -781,7 +838,10 @@ func TestGenerateDevScript_BackgroundProcesses(t *testing.T) {
 }
 
 func TestGenerateShutdownScript_DockerDown(t *testing.T) {
-	out := GenerateShutdownScript()
+	out, err := GenerateShutdownScript()
+	if err != nil {
+		t.Fatalf("GenerateShutdownScript: %v", err)
+	}
 
 	if !strings.HasPrefix(out, "#!/usr/bin/env bash") {
 		t.Errorf("expected bash shebang at start, got: %q", out[:min(30, len(out))])
