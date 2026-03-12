@@ -8,8 +8,7 @@ Generate a full-stack web application (database + server + client) from a single
 |----------|-------------------|
 | Database | PostgreSQL        |
 | Server   | Go + Gin + GORM   |
-| Client   | React             |
-| Auth     | JWT               |
+| Client   | React + TypeScript + Vite |
 
 ## Usage
 
@@ -30,7 +29,10 @@ app:
 
 database:
   host: localhost
+  port: 5432       # optional, default: 5432
   name: my_db
+  user: postgres   # optional, default: postgres
+  password: secret # optional, default: secret
 
 models:
   - name: posts        # plural snake_case → table name
@@ -48,6 +50,10 @@ models:
 
 Supported field types: `int`, `bigint`, `smallint`, `text`, `boolean`, `bool`, `date`, `datetime`, `timestamp`, `uuid`, `float`, `double`, `varchar(N)`, `char(N)`, `decimal(P,S)`
 
+Field attributes: `required` (NOT NULL), `unique` (UNIQUE constraint), `default`, `references` (foreign key, e.g. `users.id`)
+
+All models include auto-managed `id`, `created_at`, `updated_at`, and `deleted_at` (soft delete) fields via GORM.
+
 ## What gets generated
 
 Running `gapp build app.yaml` produces:
@@ -59,6 +65,7 @@ dist/
 ├── docker-compose.yml             # app + postgres services
 ├── .env                           # DB credentials
 ├── dev.sh                         # one-command dev startup (see below)
+├── shutdown.sh                    # stops docker containers
 ├── schema.sql                     # CREATE TABLE statements
 ├── migrations/
 │   ├── 001_initial.up.sql
@@ -100,6 +107,8 @@ cd dist && ./dev.sh
 1. Starts the PostgreSQL container via `docker compose up -d postgres`
 2. Waits for the database to be healthy, then applies `migrations/001_initial.up.sql`
 3. Starts the Go server with `go run .`
+
+To stop: `./shutdown.sh`
 
 No local PostgreSQL client required — migrations run inside the container.
 
