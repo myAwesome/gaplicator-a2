@@ -743,6 +743,43 @@ func TestGenerateDevScript_StartsServer(t *testing.T) {
 	}
 }
 
+func TestGenerateDevScript_StartsClient(t *testing.T) {
+	cfg := &Config{
+		App:      AppConfig{Name: "myapp", Port: 8080},
+		Database: DatabaseConfig{Host: "localhost", Name: "mydb", User: "postgres", Password: "secret", Port: 5432},
+		Models:   []Model{{Name: "users", Fields: []Field{{Name: "name", Type: "text"}}}},
+	}
+	out := GenerateDevScript(cfg)
+
+	for _, want := range []string{
+		"npm install",
+		"npm run dev",
+		"client",
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("missing %q in dev.sh output", want)
+		}
+	}
+}
+
+func TestGenerateDevScript_BackgroundProcesses(t *testing.T) {
+	cfg := &Config{
+		App:      AppConfig{Name: "myapp", Port: 8080},
+		Database: DatabaseConfig{Host: "localhost", Name: "mydb", User: "postgres", Password: "secret", Port: 5432},
+		Models:   []Model{{Name: "users", Fields: []Field{{Name: "name", Type: "text"}}}},
+	}
+	out := GenerateDevScript(cfg)
+
+	// Server runs in background so client can also start
+	if !strings.Contains(out, "go run . &") {
+		t.Error("expected server to run in background ('go run . &')")
+	}
+	// Trap ensures both processes are cleaned up on exit
+	if !strings.Contains(out, "trap") {
+		t.Error("expected trap for clean shutdown of background processes")
+	}
+}
+
 func TestGenerateShutdownScript_DockerDown(t *testing.T) {
 	out := GenerateShutdownScript()
 

@@ -31,5 +31,17 @@ echo "  migrations applied"
 echo "▸ Downloading dependencies..."
 GOTOOLCHAIN=local go get ./...
 
-echo "▸ Starting server on port {{.Port}}..."
-GOTOOLCHAIN=local go run .
+echo "▸ Starting server on port {{.Port}} (background)..."
+GOTOOLCHAIN=local go run . &
+SERVER_PID=$!
+
+# ── 4. Client ──────────────────────────────────────────────────────────────────
+echo "▸ Installing client dependencies..."
+(cd client && npm install)
+
+echo "▸ Starting client dev server..."
+(cd client && npm run dev) &
+CLIENT_PID=$!
+
+trap "kill $SERVER_PID $CLIENT_PID 2>/dev/null; exit" INT TERM
+wait $SERVER_PID $CLIENT_PID
