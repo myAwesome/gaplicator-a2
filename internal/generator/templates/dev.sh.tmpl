@@ -29,7 +29,7 @@ echo "  migrations applied"
 
 # ── 3. Server ──────────────────────────────────────────────────────────────────
 echo "▸ Downloading dependencies..."
-go mod tidy
+GOTOOLCHAIN=local go mod tidy
 
 echo "▸ Starting server on port {{.Port}}..."
-go run .
+GOTOOLCHAIN=local go run .
