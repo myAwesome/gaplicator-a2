@@ -24,6 +24,12 @@ var goModTmpl string
 //go:embed templates/.env.tmpl
 var envTmpl string
 
+//go:embed templates/dev.sh.tmpl
+var devShTmpl string
+
+//go:embed templates/shutdown.sh.tmpl
+var shutdownShTmpl string
+
 type Config struct {
 	App      AppConfig      `yaml:"app"`
 	Database DatabaseConfig `yaml:"database"`
@@ -847,6 +853,34 @@ func GenerateEnv(cfg *Config) string {
 	return buf.String()
 }
 
+// GenerateDevScript returns a dev.sh that starts postgres, applies migrations,
+// and runs the Go server.
+func GenerateDevScript(cfg *Config) string {
+	data := struct {
+		DBUser     string
+		DBPassword string
+		DBName     string
+		DBPort     int
+		Port       int
+	}{
+		DBUser:     cfg.Database.User,
+		DBPassword: cfg.Database.Password,
+		DBName:     cfg.Database.Name,
+		DBPort:     cfg.Database.Port,
+		Port:       cfg.App.Port,
+	}
+	var buf strings.Builder
+	template.Must(template.New("dev.sh").Parse(devShTmpl)).Execute(&buf, data) //nolint:errcheck
+	return buf.String()
+}
+
+// GenerateShutdownScript returns a shutdown.sh that stops docker containers.
+func GenerateShutdownScript() string {
+	var buf strings.Builder
+	template.Must(template.New("shutdown.sh").Parse(shutdownShTmpl)).Execute(&buf, nil) //nolint:errcheck
+	return buf.String()
+}
+
 // GenerateGinRoutes returns Go source code with Gin CRUD handlers and a RegisterRoutes
 // function for every model. modelsImport is the full import path of the models package
 // (e.g. "myapp/models").
@@ -1095,4 +1129,16 @@ func main() {
 		log.Fatalf("write .env: %v", err)
 	}
 	fmt.Println("Generated .env")
+
+	devSh := GenerateDevScript(cfg)
+	if err := os.WriteFile("dev.sh", []byte(devSh), 0755); err != nil {
+		log.Fatalf("write dev.sh: %v", err)
+	}
+	fmt.Println("Generated dev.sh")
+
+	shutdownSh := GenerateShutdownScript()
+	if err := os.WriteFile("shutdown.sh", []byte(shutdownSh), 0755); err != nil {
+		log.Fatalf("write shutdown.sh: %v", err)
+	}
+	fmt.Println("Generated shutdown.sh")
 }

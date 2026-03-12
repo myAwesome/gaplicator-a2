@@ -671,3 +671,122 @@ func TestGenerateGORMModels_JSONTags(t *testing.T) {
 		t.Error("should not embed gorm.Model; use Base struct instead")
 	}
 }
+
+// ── dev.sh / shutdown.sh generation tests ──────────────────────────────────
+
+func TestGenerateDevScript_ShebangAndSafety(t *testing.T) {
+	cfg := &Config{
+		App:      AppConfig{Name: "myapp", Port: 8080},
+		Database: DatabaseConfig{Host: "localhost", Name: "mydb", User: "postgres", Password: "secret", Port: 5432},
+		Models:   []Model{{Name: "users", Fields: []Field{{Name: "name", Type: "text"}}}},
+	}
+	out := GenerateDevScript(cfg)
+
+	for _, want := range []string{
+		"#!/usr/bin/env bash",
+		"set -euo pipefail",
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("missing %q in dev.sh output", want)
+		}
+	}
+}
+
+func TestGenerateDevScript_StartsDatabase(t *testing.T) {
+	cfg := &Config{
+		App:      AppConfig{Name: "myapp", Port: 8080},
+		Database: DatabaseConfig{Host: "localhost", Name: "mydb", User: "dbuser", Password: "secret", Port: 5432},
+		Models:   []Model{{Name: "users", Fields: []Field{{Name: "name", Type: "text"}}}},
+	}
+	out := GenerateDevScript(cfg)
+
+	for _, want := range []string{
+		"docker compose up -d postgres",
+		"pg_isready",
+		"dbuser",
+		"mydb",
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("missing %q in dev.sh output", want)
+		}
+	}
+}
+
+func TestGenerateDevScript_AppliesMigrations(t *testing.T) {
+	cfg := &Config{
+		App:      AppConfig{Name: "myapp", Port: 8080},
+		Database: DatabaseConfig{Host: "localhost", Name: "mydb", User: "postgres", Password: "secret", Port: 5432},
+		Models:   []Model{{Name: "users", Fields: []Field{{Name: "name", Type: "text"}}}},
+	}
+	out := GenerateDevScript(cfg)
+
+	if !strings.Contains(out, "migrations/001_initial.up.sql") {
+		t.Error("expected migration file reference in dev.sh")
+	}
+}
+
+func TestGenerateDevScript_StartsServer(t *testing.T) {
+	cfg := &Config{
+		App:      AppConfig{Name: "myapp", Port: 3000},
+		Database: DatabaseConfig{Host: "localhost", Name: "mydb", User: "postgres", Password: "secret", Port: 5432},
+		Models:   []Model{{Name: "users", Fields: []Field{{Name: "name", Type: "text"}}}},
+	}
+	out := GenerateDevScript(cfg)
+
+	for _, want := range []string{
+		"go run .",
+		"3000",
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("missing %q in dev.sh output", want)
+		}
+	}
+}
+
+func TestGenerateDevScript_StartsClient(t *testing.T) {
+	cfg := &Config{
+		App:      AppConfig{Name: "myapp", Port: 8080},
+		Database: DatabaseConfig{Host: "localhost", Name: "mydb", User: "postgres", Password: "secret", Port: 5432},
+		Models:   []Model{{Name: "users", Fields: []Field{{Name: "name", Type: "text"}}}},
+	}
+	out := GenerateDevScript(cfg)
+
+	for _, want := range []string{
+		"npm install",
+		"npm run dev",
+		"client",
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("missing %q in dev.sh output", want)
+		}
+	}
+}
+
+func TestGenerateDevScript_BackgroundProcesses(t *testing.T) {
+	cfg := &Config{
+		App:      AppConfig{Name: "myapp", Port: 8080},
+		Database: DatabaseConfig{Host: "localhost", Name: "mydb", User: "postgres", Password: "secret", Port: 5432},
+		Models:   []Model{{Name: "users", Fields: []Field{{Name: "name", Type: "text"}}}},
+	}
+	out := GenerateDevScript(cfg)
+
+	// Server runs in background so client can also start
+	if !strings.Contains(out, "go run . &") {
+		t.Error("expected server to run in background ('go run . &')")
+	}
+	// Trap ensures both processes are cleaned up on exit
+	if !strings.Contains(out, "trap") {
+		t.Error("expected trap for clean shutdown of background processes")
+	}
+}
+
+func TestGenerateShutdownScript_DockerDown(t *testing.T) {
+	out := GenerateShutdownScript()
+
+	if !strings.HasPrefix(out, "#!/usr/bin/env bash") {
+		t.Errorf("expected bash shebang at start, got: %q", out[:min(30, len(out))])
+	}
+	if !strings.Contains(out, "docker compose down") {
+		t.Error("expected 'docker compose down' in shutdown script")
+	}
+}
