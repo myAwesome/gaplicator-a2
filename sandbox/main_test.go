@@ -441,3 +441,233 @@ func min(a, b int) int {
 	}
 	return b
 }
+
+// ── React client generation tests ──────────────────────────────────────────
+
+var clientTestModel = Model{
+	Name: "students",
+	Fields: []Field{
+		{Name: "first_name", Type: "varchar(100)", Required: true},
+		{Name: "last_name", Type: "varchar(100)", Required: true},
+		{Name: "present", Type: "boolean", Default: false},
+	},
+}
+
+func TestGenerateReactTypes_Interface(t *testing.T) {
+	out := GenerateReactTypes(clientTestModel)
+
+	for _, want := range []string{
+		"export interface Student {",
+		"id: number;",
+		"first_name: string;",
+		"last_name: string;",
+		"present?: boolean;",
+		"created_at: string;",
+		"updated_at: string;",
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("missing %q in types output", want)
+		}
+	}
+}
+
+func TestGenerateReactTypes_InputType(t *testing.T) {
+	out := GenerateReactTypes(clientTestModel)
+
+	if !strings.Contains(out, "export type CreateStudentInput = {") {
+		t.Error("missing CreateStudentInput type")
+	}
+	// Required fields are non-optional in CreateInput
+	if !strings.Contains(out, "first_name: string;") {
+		t.Error("expected first_name as required string in CreateStudentInput")
+	}
+	// ID and timestamps are NOT in CreateInput
+	if strings.Contains(out, "id: number") && strings.Count(out, "id: number") > 1 {
+		t.Error("id should only appear in interface, not in CreateInput")
+	}
+}
+
+func TestGenerateReactAPI_Functions(t *testing.T) {
+	out := GenerateReactAPI(clientTestModel)
+
+	for _, want := range []string{
+		"export async function listStudents()",
+		"export async function getStudent(",
+		"export async function createStudent(",
+		"export async function updateStudent(",
+		"export async function deleteStudent(",
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("missing %q in API output", want)
+		}
+	}
+}
+
+func TestGenerateReactAPI_FetchMethods(t *testing.T) {
+	out := GenerateReactAPI(clientTestModel)
+
+	for _, want := range []string{
+		"method: 'POST'",
+		"method: 'PUT'",
+		"method: 'DELETE'",
+		"'Content-Type': 'application/json'",
+		"JSON.stringify(data)",
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("missing %q in API output", want)
+		}
+	}
+}
+
+func TestGenerateReactAPI_BaseURL(t *testing.T) {
+	out := GenerateReactAPI(clientTestModel)
+	if !strings.Contains(out, "const BASE = '/students';") {
+		t.Error("expected BASE = '/students'")
+	}
+}
+
+func TestGenerateReactAPI_TypeImport(t *testing.T) {
+	out := GenerateReactAPI(clientTestModel)
+	if !strings.Contains(out, "import type { Student, CreateStudentInput } from '../types/student';") {
+		t.Error("expected type import from '../types/student'")
+	}
+}
+
+func TestGenerateReactPage_Component(t *testing.T) {
+	out := GenerateReactPage(clientTestModel)
+
+	for _, want := range []string{
+		"export default function StudentPage()",
+		"useState<Student[]>",
+		"useState<Student | null>",
+		"useState<CreateStudentInput>",
+		"useEffect",
+		"handleSubmit",
+		"handleDelete",
+		"openCreate",
+		"openEdit",
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("missing %q in page output", want)
+		}
+	}
+}
+
+func TestGenerateReactPage_Table(t *testing.T) {
+	out := GenerateReactPage(clientTestModel)
+
+	for _, want := range []string{
+		"<th>id</th>",
+		"<th>first_name</th>",
+		"<th>last_name</th>",
+		"item.id",
+		"item.first_name",
+		"{item.present ? 'yes' : 'no'}",
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("missing %q in page table", want)
+		}
+	}
+}
+
+func TestGenerateReactPage_Form(t *testing.T) {
+	out := GenerateReactPage(clientTestModel)
+
+	// Required text field has required attribute
+	if !strings.Contains(out, `type="text"`) {
+		t.Error("expected text input for varchar field")
+	}
+	if !strings.Contains(out, " required") {
+		t.Error("expected required attribute on required fields")
+	}
+	// Boolean field uses checkbox
+	if !strings.Contains(out, `type="checkbox"`) {
+		t.Error("expected checkbox input for boolean field")
+	}
+}
+
+func TestGenerateReactApp_Routes(t *testing.T) {
+	models := []Model{
+		{Name: "students", Fields: []Field{{Name: "name", Type: "text"}}},
+		{Name: "subjects", Fields: []Field{{Name: "name", Type: "text"}}},
+	}
+	out := GenerateReactApp(models)
+
+	for _, want := range []string{
+		"import StudentPage from './pages/StudentPage';",
+		"import SubjectPage from './pages/SubjectPage';",
+		`<Route path="/students" element={<StudentPage />} />`,
+		`<Route path="/subjects" element={<SubjectPage />} />`,
+		`<NavLink to="/students">`,
+		`<NavLink to="/subjects">`,
+		"BrowserRouter",
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("missing %q in App.tsx output", want)
+		}
+	}
+}
+
+func TestGenerateReactPackageJSON_Deps(t *testing.T) {
+	cfg := &Config{App: AppConfig{Name: "myapp", Port: 8080}}
+	out := GenerateReactPackageJSON(cfg)
+
+	for _, want := range []string{
+		`"react":`,
+		`"react-dom":`,
+		`"react-router-dom":`,
+		`"vite":`,
+		`"typescript":`,
+		`"myapp-client"`,
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("missing %q in package.json", want)
+		}
+	}
+}
+
+func TestGenerateReactViteConfig_Proxy(t *testing.T) {
+	cfg := &Config{
+		App:    AppConfig{Name: "myapp", Port: 3000},
+		Models: []Model{{Name: "students"}, {Name: "subjects"}},
+	}
+	out := GenerateReactViteConfig(cfg)
+
+	for _, want := range []string{
+		"proxy:",
+		"'/students': 'http://localhost:3000'",
+		"'/subjects': 'http://localhost:3000'",
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("missing %q in vite.config.ts", want)
+		}
+	}
+}
+
+func TestGenerateGORMModels_JSONTags(t *testing.T) {
+	models := []Model{
+		{Name: "students", Fields: []Field{
+			{Name: "first_name", Type: "varchar(100)", Required: true},
+			{Name: "score", Type: "int"},
+		}},
+	}
+	out := GenerateGORMModels(models, "models")
+
+	for _, want := range []string{
+		`json:"id"`,
+		`json:"created_at"`,
+		`json:"updated_at"`,
+		`json:"first_name"`,
+		`json:"score"`,
+		"type Base struct",
+		"\tBase\n",
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("missing %q in GORM models output", want)
+		}
+	}
+	// Must NOT embed gorm.Model directly
+	if strings.Contains(out, "gorm.Model\n") {
+		t.Error("should not embed gorm.Model; use Base struct instead")
+	}
+}

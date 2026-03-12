@@ -82,6 +82,46 @@ var buildCmd = &cobra.Command{
 			{"Generating shutdown.sh", func() error {
 				return writeExecutable(filepath.Join(out, "shutdown.sh"), generator.GenerateShutdownScript())
 			}},
+			{"Generating client", func() error {
+				clientDir := filepath.Join(out, "client")
+				srcDir := filepath.Join(clientDir, "src")
+				for _, dir := range []string{
+					filepath.Join(srcDir, "types"),
+					filepath.Join(srcDir, "api"),
+					filepath.Join(srcDir, "pages"),
+				} {
+					if err := os.MkdirAll(dir, 0755); err != nil {
+						return err
+					}
+				}
+				static := map[string]string{
+					filepath.Join(clientDir, "package.json"):   generator.GenerateReactPackageJSON(cfg),
+					filepath.Join(clientDir, "index.html"):     generator.GenerateReactIndexHTML(cfg),
+					filepath.Join(clientDir, "vite.config.ts"): generator.GenerateReactViteConfig(cfg),
+					filepath.Join(clientDir, "tsconfig.json"):  generator.GenerateReactTsConfig(),
+					filepath.Join(srcDir, "main.tsx"):          generator.GenerateReactMain(),
+					filepath.Join(srcDir, "App.tsx"):           generator.GenerateReactApp(cfg.Models),
+				}
+				for path, content := range static {
+					if err := writeFile(path, content); err != nil {
+						return err
+					}
+				}
+				for _, m := range cfg.Models {
+					base := generator.ModelFileBasename(m)
+					structName := generator.ModelStructName(m)
+					if err := writeFile(filepath.Join(srcDir, "types", base+".ts"), generator.GenerateReactTypes(m)); err != nil {
+						return err
+					}
+					if err := writeFile(filepath.Join(srcDir, "api", base+".ts"), generator.GenerateReactAPI(m)); err != nil {
+						return err
+					}
+					if err := writeFile(filepath.Join(srcDir, "pages", structName+"Page.tsx"), generator.GenerateReactPage(m)); err != nil {
+						return err
+					}
+				}
+				return nil
+			}},
 		}
 
 		if err := os.MkdirAll(out, 0755); err != nil {

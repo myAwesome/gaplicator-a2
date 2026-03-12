@@ -64,9 +64,23 @@ dist/
 │   ├── 001_initial.up.sql
 │   └── 001_initial.down.sql
 ├── models/
-│   └── models.go                  # GORM structs
-└── routes/
-    └── routes.go                  # Gin CRUD handlers
+│   └── models.go                  # GORM structs (snake_case JSON tags)
+├── routes/
+│   └── routes.go                  # Gin CRUD handlers
+└── client/                        # React + TypeScript frontend
+    ├── package.json               # react, react-router-dom, vite
+    ├── index.html
+    ├── vite.config.ts             # dev proxy → Go backend
+    ├── tsconfig.json
+    └── src/
+        ├── main.tsx
+        ├── App.tsx                # nav + routes per model
+        ├── types/
+        │   └── {model}.ts        # TypeScript interfaces
+        ├── api/
+        │   └── {model}.ts        # fetch wrappers (list/get/create/update/delete)
+        └── pages/
+            └── {Model}Page.tsx   # CRUD table + inline form
 ```
 
 ## Getting Started
