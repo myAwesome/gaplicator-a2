@@ -37,9 +37,6 @@ var buildCmd = &cobra.Command{
 			name string
 			fn   func() error
 		}{
-			{"Generating schema.sql", func() error {
-				return writeFile(filepath.Join(out, "schema.sql"), generator.GenerateSchema(cfg.Models))
-			}},
 			{"Generating migrations", func() error {
 				dir := filepath.Join(out, "migrations")
 				if err := os.MkdirAll(dir, 0755); err != nil {

@@ -168,7 +168,7 @@ func ValidateConfig(cfg *Config) []error {
 	return errs
 }
 
-func GenerateSchema(models []Model) string {
+func GenerateMigrationUp(models []Model) string {
 	sorted := topoSort(models)
 	var sb strings.Builder
 	for i, m := range sorted {
@@ -178,10 +178,6 @@ func GenerateSchema(models []Model) string {
 		sb.WriteString(tableSQL(m))
 	}
 	return sb.String()
-}
-
-func GenerateMigrationUp(models []Model) string {
-	return GenerateSchema(models)
 }
 
 func GenerateMigrationDown(models []Model) string {
