@@ -34,6 +34,9 @@ var reactAPITmpl string
 //go:embed templates/react_page_tsx.tmpl
 var reactPageTmpl string
 
+//go:embed templates/react_app_css.tmpl
+var reactAppCSSTmpl string
+
 // ModelStructName returns the PascalCase singular struct name for a model (e.g. "students" → "Student").
 func ModelStructName(m Model) string {
 	return toPascalCase(toSingular(m.Name))
@@ -160,6 +163,11 @@ func GenerateReactTsConfig() string {
 // GenerateReactMain returns src/main.tsx for the React client.
 func GenerateReactMain() string {
 	return execTmpl("react_main_tsx", reactMainTmpl, nil)
+}
+
+// GenerateReactAppCSS returns src/app.css with application styles.
+func GenerateReactAppCSS() string {
+	return execTmpl("react_app_css", reactAppCSSTmpl, nil)
 }
 
 // GenerateReactApp returns src/App.tsx with navigation and routes for all models.

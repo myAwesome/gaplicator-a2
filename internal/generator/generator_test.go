@@ -637,8 +637,8 @@ func TestGenerateReactApp_Routes(t *testing.T) {
 		"import SubjectPage from './pages/SubjectPage';",
 		`<Route path="/students" element={<StudentPage />} />`,
 		`<Route path="/subjects" element={<SubjectPage />} />`,
-		`<NavLink to="/students">`,
-		`<NavLink to="/subjects">`,
+		`<NavLink to="/students"`,
+		`<NavLink to="/subjects"`,
 		"BrowserRouter",
 	} {
 		if !strings.Contains(out, want) {

@@ -121,6 +121,7 @@ var buildCmd = &cobra.Command{
 					filepath.Join(clientDir, "vite.config.ts"): generator.GenerateReactViteConfig(cfg),
 					filepath.Join(clientDir, "tsconfig.json"):  generator.GenerateReactTsConfig(),
 					filepath.Join(srcDir, "main.tsx"):          generator.GenerateReactMain(),
+					filepath.Join(srcDir, "app.css"):           generator.GenerateReactAppCSS(),
 					filepath.Join(srcDir, "App.tsx"):           generator.GenerateReactApp(cfg.Models),
 				}
 				for path, content := range static {

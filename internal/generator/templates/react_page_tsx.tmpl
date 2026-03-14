@@ -70,24 +70,41 @@ export default function {{.ComponentName}}() {
 
   return (
     <div>
-      <h1>{{.ModelName}}</h1>
-      <button onClick={openCreate}>+ New</button>
+      <div className="page-header">
+        <h1>{{.ModelName}}</h1>
+        <button className="btn btn-primary" onClick={openCreate}>+ New</button>
+      </div>
 
       {showForm && (
-        <form onSubmit={handleSubmit}>
-{{range .FormInputs}}{{if .IsFK}}          <label>{{.FieldName}} <select value={form.{{.FieldName}} as number} onChange={e => setForm({...form, {{.FieldName}}: Number(e.target.value)})}{{if .Required}} required{{end}}>
-            <option value={0}>-- select --</option>
-            { {{.OptionsVar}}.map(opt => (<option key={opt.id} value={opt.id}>{opt.{{.LabelField}}}</option>))}
-          </select></label>
-{{else if .IsCheckbox}}          <label>{{.FieldName}} <input type="checkbox" checked={form.{{.FieldName}} as boolean} onChange={e => setForm({...form, {{.FieldName}}: e.target.checked})} /></label>
-{{else if .IsNumber}}          <label>{{.FieldName}} <input type="number" value={form.{{.FieldName}} as number} onChange={e => setForm({...form, {{.FieldName}}: Number(e.target.value)})}{{if .Required}} required{{end}} /></label>
-{{else}}          <label>{{.FieldName}} <input type="{{.InputType}}" value={form.{{.FieldName}} as string} onChange={e => setForm({...form, {{.FieldName}}: e.target.value})}{{if .Required}} required{{end}} /></label>
-{{end}}{{end}}          <button type="submit">{editing ? 'Save' : 'Create'}</button>
-          <button type="button" onClick={() => setShowForm(false)}>Cancel</button>
-        </form>
+        <div className="form-card">
+          <form onSubmit={handleSubmit}>
+{{range .FormInputs}}{{if .IsFK}}            <div className="form-group">
+              <label className="form-label">{{.FieldName}}</label>
+              <select className="form-select" value={form.{{.FieldName}} as number} onChange={e => setForm({...form, {{.FieldName}}: Number(e.target.value)})}{{if .Required}} required{{end}}>
+                <option value={0}>-- select --</option>
+                { {{.OptionsVar}}.map(opt => (<option key={opt.id} value={opt.id}>{opt.{{.LabelField}}}</option>))}
+              </select>
+            </div>
+{{else if .IsCheckbox}}            <div className="form-group form-group--checkbox">
+              <label className="form-label"><input type="checkbox" checked={form.{{.FieldName}} as boolean} onChange={e => setForm({...form, {{.FieldName}}: e.target.checked})} /> {{.FieldName}}</label>
+            </div>
+{{else if .IsNumber}}            <div className="form-group">
+              <label className="form-label">{{.FieldName}}</label>
+              <input className="form-input" type="number" value={form.{{.FieldName}} as number} onChange={e => setForm({...form, {{.FieldName}}: Number(e.target.value)})}{{if .Required}} required{{end}} />
+            </div>
+{{else}}            <div className="form-group">
+              <label className="form-label">{{.FieldName}}</label>
+              <input className="form-input" type="{{.InputType}}" value={form.{{.FieldName}} as string} onChange={e => setForm({...form, {{.FieldName}}: e.target.value})}{{if .Required}} required{{end}} />
+            </div>
+{{end}}{{end}}            <div className="form-actions">
+              <button type="submit" className="btn btn-primary">{editing ? 'Save' : 'Create'}</button>
+              <button type="button" className="btn" onClick={() => setShowForm(false)}>Cancel</button>
+            </div>
+          </form>
+        </div>
       )}
 
-      <table>
+      <table className="data-table">
         <thead><tr><th>id</th>{{range .TableHeaders}}<th>{{.}}</th>{{end}}<th></th></tr></thead>
         <tbody>
           {items.map(item => (
@@ -95,17 +112,19 @@ export default function {{.ComponentName}}() {
               <td>{item.id}</td>
 {{range .TableCells}}              <td>{{.Expr}}</td>
 {{end}}              <td>
-                <button onClick={() => openEdit(item)}>Edit</button>
-                <button onClick={() => handleDelete(item.id)}>Del</button>
+                <div className="row-actions">
+                  <button className="btn btn-sm" onClick={() => openEdit(item)}>Edit</button>
+                  <button className="btn btn-sm btn-danger" onClick={() => handleDelete(item.id)}>Del</button>
+                </div>
               </td>
             </tr>
           ))}
         </tbody>
       </table>
-      <div>
-        <button onClick={() => load(page - 1)} disabled={page <= 1}>Prev</button>
+      <div className="pagination">
+        <button className="btn" onClick={() => load(page - 1)} disabled={page <= 1}>Prev</button>
         <span>{page} / {Math.ceil(total / limit) || 1} ({total} total)</span>
-        <button onClick={() => load(page + 1)} disabled={page * limit >= total}>Next</button>
+        <button className="btn" onClick={() => load(page + 1)} disabled={page * limit >= total}>Next</button>
       </div>
     </div>
   );

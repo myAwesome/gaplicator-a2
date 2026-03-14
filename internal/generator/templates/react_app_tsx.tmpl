@@ -4,11 +4,10 @@ import { BrowserRouter, Routes, Route, NavLink } from 'react-router-dom';
 export default function App() {
   return (
     <BrowserRouter>
-      <nav>
-{{range $i, $m := .Models}}{{if gt $i 0}}        {' | '}
-{{end}}        <NavLink to="/{{$m.Name}}">{{$m.StructName}}</NavLink>
+      <nav className="app-nav">
+{{range .Models}}        <NavLink to="/{{.Name}}" className={({ isActive }) => isActive ? 'active' : ''}>{{.StructName}}</NavLink>
 {{end}}      </nav>
-      <main>
+      <main className="app-main">
         <Routes>
 {{range .Models}}          <Route path="/{{.Name}}" element={<{{.StructName}}Page />} />
 {{end}}        </Routes>
