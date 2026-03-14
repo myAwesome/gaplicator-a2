@@ -29,6 +29,12 @@ var devShTmpl string
 //go:embed templates/shutdown.sh.tmpl
 var shutdownShTmpl string
 
+//go:embed templates/gorm_models.go.tmpl
+var gormModelsTmpl string
+
+//go:embed templates/gin_routes.go.tmpl
+var ginRoutesTmpl string
+
 type Config struct {
 	App      AppConfig      `yaml:"app"`
 	Database DatabaseConfig `yaml:"database"`
@@ -350,37 +356,37 @@ func buildFieldTags(f Field) string {
 	return `gorm:"` + strings.Join(parts, ";") + `" json:"` + f.Name + `"`
 }
 
+type gormFieldData struct {
+	FieldName  string
+	GoType     string
+	Tags       string
+	AssocField string
+	AssocType  string
+	AssocTags  string
+}
+
+type gormModelData struct {
+	StructName string
+	Fields     []gormFieldData
+}
+
 func GenerateGORMModels(models []Model, pkgName string) string {
 	structNames := make(map[string]string, len(models))
 	for _, m := range models {
 		structNames[m.Name] = toPascalCase(toSingular(m.Name))
 	}
 
-	var sb strings.Builder
-	sb.WriteString("package " + pkgName + "\n\n")
-	sb.WriteString("import (\n")
-	sb.WriteString("\t\"time\"\n\n")
-	sb.WriteString("\t\"gorm.io/gorm\"\n")
-	sb.WriteString(")\n")
-
-	sb.WriteString("\ntype Base struct {\n")
-	sb.WriteString("\tID        uint           `gorm:\"primarykey\" json:\"id\"`\n")
-	sb.WriteString("\tCreatedAt time.Time      `json:\"created_at\"`\n")
-	sb.WriteString("\tUpdatedAt time.Time      `json:\"updated_at\"`\n")
-	sb.WriteString("\tDeletedAt gorm.DeletedAt `gorm:\"index\" json:\"deleted_at,omitempty\"`\n")
-	sb.WriteString("}\n")
-
+	modelData := make([]gormModelData, 0, len(models))
 	for _, m := range models {
 		structName := structNames[m.Name]
-		sb.WriteString("\ntype " + structName + " struct {\n")
-		sb.WriteString("\tBase\n")
-
+		fields := make([]gormFieldData, 0, len(m.Fields))
 		for _, f := range m.Fields {
 			fieldName := toPascalCase(f.Name)
-			goType := sqlTypeToGo(f.Type)
-			tags := buildFieldTags(f)
-			fmt.Fprintf(&sb, "\t%-20s %-12s `%s`\n", fieldName, goType, tags)
-
+			fd := gormFieldData{
+				FieldName: fieldName,
+				GoType:    sqlTypeToGo(f.Type),
+				Tags:      buildFieldTags(f),
+			}
 			if f.References != "" {
 				parts := strings.SplitN(f.References, ".", 2)
 				if assocStruct, ok := structNames[parts[0]]; ok {
@@ -395,15 +401,24 @@ func GenerateGORMModels(models []Model, pkgName string) string {
 					if assocJsonName == f.Name {
 						assocJsonName = strings.TrimSuffix(f.Name, "_ID")
 					}
-					fmt.Fprintf(&sb, "\t%-20s %-12s `gorm:\"foreignKey:%s\" json:\"%s\"`\n", assocField, assocStruct, fieldName, assocJsonName)
+					fd.AssocField = assocField
+					fd.AssocType = assocStruct
+					fd.AssocTags = fmt.Sprintf("gorm:\"foreignKey:%s\" json:\"%s\"", fieldName, assocJsonName)
 				}
 			}
+			fields = append(fields, fd)
 		}
-
-		sb.WriteString("}\n")
+		modelData = append(modelData, gormModelData{StructName: structName, Fields: fields})
 	}
 
-	return sb.String()
+	data := struct {
+		PkgName string
+		Models  []gormModelData
+	}{PkgName: pkgName, Models: modelData}
+
+	var buf strings.Builder
+	template.Must(template.New("gorm_models").Parse(gormModelsTmpl)).Execute(&buf, data) //nolint:errcheck
+	return buf.String()
 }
 
 func GenerateMain(cfg *Config, appImport string) (string, error) {
@@ -509,122 +524,39 @@ func GenerateShutdownScript() (string, error) {
 	return buf.String(), nil
 }
 
+type ginModelData struct {
+	Name     string
+	Singular string
+	Type     string
+	Base     string
+	BaseID   string
+}
+
 func GenerateGinRoutes(models []Model, pkgName string, modelsImport string) string {
 	modPkg := modelsImport
 	if idx := strings.LastIndex(modelsImport, "/"); idx >= 0 {
 		modPkg = modelsImport[idx+1:]
 	}
 
-	var sb strings.Builder
-	fmt.Fprintf(&sb, "package %s\n\n", pkgName)
-	sb.WriteString("import (\n")
-	sb.WriteString("\t\"net/http\"\n")
-	sb.WriteString("\t\"strconv\"\n\n")
-	sb.WriteString("\t\"github.com/gin-gonic/gin\"\n")
-	sb.WriteString("\t\"gorm.io/gorm\"\n")
-	fmt.Fprintf(&sb, "\t%q\n", modelsImport)
-	sb.WriteString(")\n\n")
-
-	sb.WriteString("// RegisterRoutes wires all CRUD routes onto r.\n")
-	sb.WriteString("func RegisterRoutes(r *gin.Engine, db *gorm.DB) {\n")
-	for _, m := range models {
-		base := "/" + m.Name
-		s := toPascalCase(toSingular(m.Name))
-		fmt.Fprintf(&sb, "\tr.GET(%q, list%s(db))\n", base, s)
-		fmt.Fprintf(&sb, "\tr.GET(%q, get%s(db))\n", base+"/:id", s)
-		fmt.Fprintf(&sb, "\tr.POST(%q, create%s(db))\n", base, s)
-		fmt.Fprintf(&sb, "\tr.PUT(%q, update%s(db))\n", base+"/:id", s)
-		fmt.Fprintf(&sb, "\tr.DELETE(%q, delete%s(db))\n", base+"/:id", s)
-	}
-	sb.WriteString("}\n")
-
+	ginModels := make([]ginModelData, 0, len(models))
 	for _, m := range models {
 		s := toPascalCase(toSingular(m.Name))
-		typ := modPkg + "." + s
-
-		fmt.Fprintf(&sb, `
-func list%[1]s(db *gorm.DB) gin.HandlerFunc {
-	return func(c *gin.Context) {
-		var rows []%[2]s
-		if err := db.Find(&rows).Error; err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-			return
-		}
-		c.JSON(http.StatusOK, rows)
-	}
-}
-
-func get%[1]s(db *gorm.DB) gin.HandlerFunc {
-	return func(c *gin.Context) {
-		id, err := strconv.Atoi(c.Param("id"))
-		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
-			return
-		}
-		var row %[2]s
-		if err := db.First(&row, id).Error; err != nil {
-			c.JSON(http.StatusNotFound, gin.H{"error": "not found"})
-			return
-		}
-		c.JSON(http.StatusOK, row)
-	}
-}
-
-func create%[1]s(db *gorm.DB) gin.HandlerFunc {
-	return func(c *gin.Context) {
-		var row %[2]s
-		if err := c.ShouldBindJSON(&row); err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-			return
-		}
-		if err := db.Create(&row).Error; err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-			return
-		}
-		c.JSON(http.StatusCreated, row)
-	}
-}
-
-func update%[1]s(db *gorm.DB) gin.HandlerFunc {
-	return func(c *gin.Context) {
-		id, err := strconv.Atoi(c.Param("id"))
-		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
-			return
-		}
-		var row %[2]s
-		if err := db.First(&row, id).Error; err != nil {
-			c.JSON(http.StatusNotFound, gin.H{"error": "not found"})
-			return
-		}
-		if err := c.ShouldBindJSON(&row); err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-			return
-		}
-		if err := db.Save(&row).Error; err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-			return
-		}
-		c.JSON(http.StatusOK, row)
-	}
-}
-
-func delete%[1]s(db *gorm.DB) gin.HandlerFunc {
-	return func(c *gin.Context) {
-		id, err := strconv.Atoi(c.Param("id"))
-		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
-			return
-		}
-		if err := db.Delete(&%[2]s{}, id).Error; err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-			return
-		}
-		c.Status(http.StatusNoContent)
-	}
-}
-`, s, typ)
+		ginModels = append(ginModels, ginModelData{
+			Name:     m.Name,
+			Singular: s,
+			Type:     modPkg + "." + s,
+			Base:     "/" + m.Name,
+			BaseID:   "/" + m.Name + "/:id",
+		})
 	}
 
-	return sb.String()
+	data := struct {
+		PkgName      string
+		ModelsImport string
+		Models       []ginModelData
+	}{PkgName: pkgName, ModelsImport: modelsImport, Models: ginModels}
+
+	var buf strings.Builder
+	template.Must(template.New("gin_routes").Parse(ginRoutesTmpl)).Execute(&buf, data) //nolint:errcheck
+	return buf.String()
 }

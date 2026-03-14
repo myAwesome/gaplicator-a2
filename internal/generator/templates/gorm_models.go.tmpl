@@ -1,0 +1,21 @@
+package {{.PkgName}}
+
+import (
+	"time"
+
+	"gorm.io/gorm"
+)
+
+type Base struct {
+	ID        uint           `gorm:"primarykey" json:"id"`
+	CreatedAt time.Time      `json:"created_at"`
+	UpdatedAt time.Time      `json:"updated_at"`
+	DeletedAt gorm.DeletedAt `gorm:"index" json:"deleted_at,omitempty"`
+}
+{{range .Models}}
+type {{.StructName}} struct {
+	Base
+{{range .Fields}}	{{printf "%-20s %-12s" .FieldName .GoType}}`{{.Tags}}`
+{{if .AssocField}}	{{printf "%-20s %-12s" .AssocField .AssocType}}`{{.AssocTags}}`
+{{end}}{{end}}}
+{{end}}

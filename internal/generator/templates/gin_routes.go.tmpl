@@ -1,0 +1,112 @@
+package {{.PkgName}}
+
+import (
+	"net/http"
+	"strconv"
+
+	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
+	{{printf "%q" .ModelsImport}}
+)
+
+// RegisterRoutes wires all CRUD routes onto r.
+func RegisterRoutes(r *gin.Engine, db *gorm.DB) {
+{{range .Models}}	r.GET({{printf "%q" .Base}}, list{{.Singular}}(db))
+	r.GET({{printf "%q" .BaseID}}, get{{.Singular}}(db))
+	r.POST({{printf "%q" .Base}}, create{{.Singular}}(db))
+	r.PUT({{printf "%q" .BaseID}}, update{{.Singular}}(db))
+	r.DELETE({{printf "%q" .BaseID}}, delete{{.Singular}}(db))
+{{end}}}
+{{range .Models}}
+func list{{.Singular}}(db *gorm.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+		limit, _ := strconv.Atoi(c.DefaultQuery("limit", "20"))
+		if page < 1 {
+			page = 1
+		}
+		if limit < 1 || limit > 100 {
+			limit = 20
+		}
+		offset := (page - 1) * limit
+		var total int64
+		db.Model(&{{.Type}}{}).Count(&total)
+		var rows []{{.Type}}
+		if err := db.Offset(offset).Limit(limit).Find(&rows).Error; err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"data": rows, "total": total, "page": page, "limit": limit})
+	}
+}
+
+func get{{.Singular}}(db *gorm.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		id, err := strconv.Atoi(c.Param("id"))
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
+			return
+		}
+		var row {{.Type}}
+		if err := db.First(&row, id).Error; err != nil {
+			c.JSON(http.StatusNotFound, gin.H{"error": "not found"})
+			return
+		}
+		c.JSON(http.StatusOK, row)
+	}
+}
+
+func create{{.Singular}}(db *gorm.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var row {{.Type}}
+		if err := c.ShouldBindJSON(&row); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		if err := db.Create(&row).Error; err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusCreated, row)
+	}
+}
+
+func update{{.Singular}}(db *gorm.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		id, err := strconv.Atoi(c.Param("id"))
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
+			return
+		}
+		var row {{.Type}}
+		if err := db.First(&row, id).Error; err != nil {
+			c.JSON(http.StatusNotFound, gin.H{"error": "not found"})
+			return
+		}
+		if err := c.ShouldBindJSON(&row); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		if err := db.Save(&row).Error; err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, row)
+	}
+}
+
+func delete{{.Singular}}(db *gorm.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		id, err := strconv.Atoi(c.Param("id"))
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
+			return
+		}
+		if err := db.Delete(&{{.Type}}{}, id).Error; err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		c.Status(http.StatusNoContent)
+	}
+}
+{{end}}

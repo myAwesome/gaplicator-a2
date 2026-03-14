@@ -1,0 +1,11 @@
+export interface {{.StructName}} {
+  id: number;
+{{range .Fields}}  {{.Name}}{{if not .Required}}?{{end}}: {{.TSType}};
+{{end}}  created_at: string;
+  updated_at: string;
+  deleted_at?: string;
+}
+
+export type Create{{.StructName}}Input = {
+{{range .Fields}}  {{.Name}}: {{.TSType}};
+{{end}}};

@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"log"
+	"net/http"
 	"os"
 
 	"github.com/gin-gonic/gin"
@@ -24,9 +25,14 @@ func main() {
 		dbPort = "5432"
 	}
 
+	dbSSLMode := os.Getenv("DB_SSLMODE")
+	if dbSSLMode == "" {
+		dbSSLMode = "disable"
+	}
+
 	dsn := fmt.Sprintf(
-		"host=%s user=%s password=%s dbname=%s port=%s sslmode=disable",
-		dbHost, os.Getenv("DB_USER"), os.Getenv("DB_PASSWORD"), {{.DBName}}, dbPort,
+		"host=%s user=%s password=%s dbname=%s port=%s sslmode=%s",
+		dbHost, os.Getenv("DB_USER"), os.Getenv("DB_PASSWORD"), {{.DBName}}, dbPort, dbSSLMode,
 	)
 
 	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
@@ -43,6 +49,18 @@ func main() {
 	}
 
 	r := gin.Default()
+
+	r.Use(func(c *gin.Context) {
+		c.Header("Access-Control-Allow-Origin", "*")
+		c.Header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+		c.Header("Access-Control-Allow-Headers", "Content-Type, Authorization")
+		if c.Request.Method == "OPTIONS" {
+			c.AbortWithStatus(http.StatusNoContent)
+			return
+		}
+		c.Next()
+	})
+
 	routes.RegisterRoutes(r, db)
 
 	if err := r.Run(":{{.Port}}"); err != nil {

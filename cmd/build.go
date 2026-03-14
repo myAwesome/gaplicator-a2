@@ -137,7 +137,7 @@ var buildCmd = &cobra.Command{
 					if err := writeFile(filepath.Join(srcDir, "api", base+".ts"), generator.GenerateReactAPI(m)); err != nil {
 						return err
 					}
-					if err := writeFile(filepath.Join(srcDir, "pages", structName+"Page.tsx"), generator.GenerateReactPage(m)); err != nil {
+					if err := writeFile(filepath.Join(srcDir, "pages", structName+"Page.tsx"), generator.GenerateReactPage(m, cfg.Models)); err != nil {
 						return err
 					}
 				}

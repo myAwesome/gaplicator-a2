@@ -530,7 +530,7 @@ func TestGenerateReactAPI_Functions(t *testing.T) {
 	out := GenerateReactAPI(clientTestModel)
 
 	for _, want := range []string{
-		"export async function listStudents()",
+		"export async function listStudents(",
 		"export async function getStudent(",
 		"export async function createStudent(",
 		"export async function updateStudent(",
@@ -573,7 +573,7 @@ func TestGenerateReactAPI_TypeImport(t *testing.T) {
 }
 
 func TestGenerateReactPage_Component(t *testing.T) {
-	out := GenerateReactPage(clientTestModel)
+	out := GenerateReactPage(clientTestModel, nil)
 
 	for _, want := range []string{
 		"export default function StudentPage()",
@@ -593,7 +593,7 @@ func TestGenerateReactPage_Component(t *testing.T) {
 }
 
 func TestGenerateReactPage_Table(t *testing.T) {
-	out := GenerateReactPage(clientTestModel)
+	out := GenerateReactPage(clientTestModel, nil)
 
 	for _, want := range []string{
 		"<th>id</th>",
@@ -610,7 +610,7 @@ func TestGenerateReactPage_Table(t *testing.T) {
 }
 
 func TestGenerateReactPage_Form(t *testing.T) {
-	out := GenerateReactPage(clientTestModel)
+	out := GenerateReactPage(clientTestModel, nil)
 
 	// Required text field has required attribute
 	if !strings.Contains(out, `type="text"`) {
@@ -834,6 +834,202 @@ func TestGenerateDevScript_BackgroundProcesses(t *testing.T) {
 	// Trap ensures both processes are cleaned up on exit
 	if !strings.Contains(out, "trap") {
 		t.Error("expected trap for clean shutdown of background processes")
+	}
+}
+
+// ── Pagination tests ────────────────────────────────────────────────────────
+
+func TestGenerateGinRoutes_Pagination(t *testing.T) {
+	out := GenerateGinRoutes([]Model{
+		{Name: "items", Fields: []Field{{Name: "title", Type: "text"}}},
+	}, "routes", "app/models")
+
+	for _, want := range []string{
+		`c.DefaultQuery("page", "1")`,
+		`c.DefaultQuery("limit", "20")`,
+		`db.Offset(offset).Limit(limit).Find(&rows)`,
+		`db.Model(&models.Item{}).Count(&total)`,
+		`"data": rows`,
+		`"total": total`,
+		`"page": page`,
+		`"limit": limit`,
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("missing pagination code: %s", want)
+		}
+	}
+}
+
+func TestGenerateReactAPI_Pagination(t *testing.T) {
+	out := GenerateReactAPI(clientTestModel)
+
+	for _, want := range []string{
+		"export interface PaginatedStudents {",
+		"data: Student[];",
+		"total: number;",
+		"page = 1, limit = 20",
+		"Promise<PaginatedStudents>",
+		"?page=${page}&limit=${limit}",
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("missing pagination in API: %s", want)
+		}
+	}
+}
+
+func TestGenerateReactPage_Pagination(t *testing.T) {
+	out := GenerateReactPage(clientTestModel, nil)
+
+	for _, want := range []string{
+		"useState(1)",
+		"setTotal",
+		"const limit = 20",
+		"load(1)",
+		"load(p: number)",
+		"res.data",
+		"res.total",
+		"Prev",
+		"Next",
+		"Math.ceil(total / limit)",
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("missing pagination in page: %s", want)
+		}
+	}
+}
+
+// ── CORS + sslmode tests ────────────────────────────────────────────────────
+
+func TestGenerateMain_CORS(t *testing.T) {
+	cfg := &Config{
+		App:      AppConfig{Name: "myapp", Port: 8080},
+		Database: DatabaseConfig{Host: "localhost", Name: "mydb"},
+		Models:   []Model{{Name: "items", Fields: []Field{{Name: "title", Type: "text"}}}},
+	}
+	out, err := GenerateMain(cfg, "myapp")
+	if err != nil {
+		t.Fatalf("GenerateMain: %v", err)
+	}
+
+	for _, want := range []string{
+		"Access-Control-Allow-Origin",
+		"Access-Control-Allow-Methods",
+		"Access-Control-Allow-Headers",
+		`c.Request.Method == "OPTIONS"`,
+		"c.AbortWithStatus",
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("missing CORS middleware: %s", want)
+		}
+	}
+}
+
+func TestGenerateMain_SSLMode(t *testing.T) {
+	cfg := &Config{
+		App:      AppConfig{Name: "myapp", Port: 8080},
+		Database: DatabaseConfig{Host: "localhost", Name: "mydb"},
+		Models:   []Model{{Name: "items", Fields: []Field{{Name: "title", Type: "text"}}}},
+	}
+	out, err := GenerateMain(cfg, "myapp")
+	if err != nil {
+		t.Fatalf("GenerateMain: %v", err)
+	}
+
+	for _, want := range []string{
+		`os.Getenv("DB_SSLMODE")`,
+		`dbSSLMode = "disable"`,
+		`sslmode=%s`,
+		`dbSSLMode`,
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("missing sslmode in main: %s", want)
+		}
+	}
+}
+
+func TestGenerateEnv_SSLMode(t *testing.T) {
+	cfg := &Config{
+		App:      AppConfig{Name: "myapp", Port: 8080},
+		Database: DatabaseConfig{Host: "localhost", Port: 5432, Name: "mydb", User: "postgres", Password: "secret"},
+	}
+	out, err := GenerateEnv(cfg)
+	if err != nil {
+		t.Fatalf("GenerateEnv: %v", err)
+	}
+
+	if !strings.Contains(out, "DB_SSLMODE=disable") {
+		t.Error("expected DB_SSLMODE=disable in .env")
+	}
+}
+
+// ── datetime/timestamp tests ────────────────────────────────────────────────
+
+func TestGenerateReactPage_DatetimeLocalInput(t *testing.T) {
+	m := Model{
+		Name: "events",
+		Fields: []Field{
+			{Name: "name", Type: "varchar(100)", Required: true},
+			{Name: "starts_at", Type: "datetime", Required: true},
+			{Name: "ends_at", Type: "timestamp"},
+		},
+	}
+	out := GenerateReactPage(m, nil)
+
+	if !strings.Contains(out, `type="datetime-local"`) {
+		t.Error("expected datetime-local input for datetime field")
+	}
+	// openEdit should slice to 16 chars (YYYY-MM-DDTHH:MM)
+	if !strings.Contains(out, ".slice(0, 16)") {
+		t.Error("expected slice(0, 16) for datetime-local value in openEdit")
+	}
+	// handleSubmit should append :00Z
+	if !strings.Contains(out, "':00Z'") {
+		t.Error("expected ':00Z' suffix for datetime-local payload")
+	}
+}
+
+// ── FK dropdown tests ───────────────────────────────────────────────────────
+
+func TestGenerateReactPage_FKDropdown(t *testing.T) {
+	allModels := []Model{
+		{Name: "subjects", Fields: []Field{{Name: "name", Type: "varchar(200)", Required: true}}},
+		{Name: "lessons", Fields: []Field{
+			{Name: "date", Type: "date", Required: true},
+			{Name: "subject_id", Type: "int", References: "subjects.id"},
+		}},
+	}
+	lessonModel := allModels[1]
+	out := GenerateReactPage(lessonModel, allModels)
+
+	for _, want := range []string{
+		"import type { Subject } from '../types/subject'",
+		"import { listSubjects } from '../api/subject'",
+		"subjectOptions",
+		"listSubjects(1, 1000)",
+		`<select`,
+		"-- select --",
+		"opt.name",
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("missing FK dropdown code: %s", want)
+		}
+	}
+	// The subject_id field should NOT render as a number input
+	if strings.Contains(out, `type="number"`) {
+		t.Error("FK field should use <select>, not type=number input")
+	}
+}
+
+func TestGenerateReactPage_FKLabelFallback(t *testing.T) {
+	// When referenced model has no "name"/"title" field, use first field
+	allModels := []Model{
+		{Name: "codes", Fields: []Field{{Name: "value", Type: "varchar(10)", Required: true}}},
+		{Name: "items", Fields: []Field{{Name: "code_id", Type: "int", References: "codes.id"}}},
+	}
+	out := GenerateReactPage(allModels[1], allModels)
+
+	if !strings.Contains(out, "opt.value") {
+		t.Error("expected opt.value as label for model with no name/title field")
 	}
 }
 

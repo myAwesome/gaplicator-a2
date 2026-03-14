@@ -1,0 +1,18 @@
+import { BrowserRouter, Routes, Route, NavLink } from 'react-router-dom';
+{{range .Models}}import {{.StructName}}Page from './pages/{{.StructName}}Page';
+{{end}}
+export default function App() {
+  return (
+    <BrowserRouter>
+      <nav>
+{{range $i, $m := .Models}}{{if gt $i 0}}        {' | '}
+{{end}}        <NavLink to="/{{$m.Name}}">{{$m.StructName}}</NavLink>
+{{end}}      </nav>
+      <main>
+        <Routes>
+{{range .Models}}          <Route path="/{{.Name}}" element={<{{.StructName}}Page />} />
+{{end}}        </Routes>
+      </main>
+    </BrowserRouter>
+  );
+}

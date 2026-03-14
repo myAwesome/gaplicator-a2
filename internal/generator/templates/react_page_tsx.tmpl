@@ -1,0 +1,112 @@
+import { useState, useEffect } from 'react';
+import type { {{.StructName}}, Create{{.StructName}}Input } from '../types/{{.Singular}}';
+import { list{{.PluralName}}, create{{.StructName}}, update{{.StructName}}, delete{{.StructName}} } from '../api/{{.Singular}}';
+{{range .FKImports}}import type { {{.RefStruct}} } from '../types/{{.RefSingular}}';
+import { list{{.RefPlural}} } from '../api/{{.RefSingular}}';
+{{end}}
+const EMPTY_FORM: Create{{.StructName}}Input = {
+{{range .FormFields}}  {{.Name}}: {{.Default}},
+{{end}}};
+
+export default function {{.ComponentName}}() {
+  const [items, setItems] = useState<{{.StructName}}[]>([]);
+  const [editing, setEditing] = useState<{{.StructName}} | null>(null);
+  const [form, setForm] = useState<Create{{.StructName}}Input>(EMPTY_FORM);
+  const [showForm, setShowForm] = useState(false);
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
+  const limit = 20;
+{{range .FKImports}}  const [{{.OptionsVar}}, {{.SetterVar}}] = useState<{{.RefStruct}}[]>([]);
+{{end}}
+{{if .HasFKs}}  useEffect(() => { load(1); loadRefs(); }, []);
+{{else}}  useEffect(() => { load(1); }, []);
+{{end}}
+{{if .HasFKs}}  async function loadRefs() {
+    try {
+{{range .FKImports}}      {{.SetterVar}}((await list{{.RefPlural}}(1, 1000)).data);
+{{end}}    } catch (e) { console.error(e); }
+  }
+
+{{end}}  async function load(p: number) {
+    try {
+      const res = await list{{.PluralName}}(p, limit);
+      setItems(res.data);
+      setTotal(res.total);
+      setPage(p);
+    } catch (e) { console.error(e); }
+  }
+
+  function openCreate() {
+    setEditing(null); setForm(EMPTY_FORM); setShowForm(true);
+  }
+
+  function openEdit(item: {{.StructName}}) {
+    setEditing(item);
+    setForm({
+{{range .OpenEditFields}}      {{.Name}}: {{.Expr}},
+{{end}}    });
+    setShowForm(true);
+  }
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    try {
+{{if .NeedsPayload}}      const payload = {
+        ...form,
+{{range .PayloadFields}}        {{.Name}}: {{.Expr}},
+{{end}}      };
+      if (editing) await update{{.StructName}}(editing.id, payload);
+      else await create{{.StructName}}(payload);
+{{else}}      if (editing) await update{{.StructName}}(editing.id, form);
+      else await create{{.StructName}}(form);
+{{end}}      setShowForm(false); load(page);
+    } catch (e) { console.error(e); }
+  }
+
+  async function handleDelete(id: number) {
+    if (!confirm('Delete?')) return;
+    try { await delete{{.StructName}}(id); load(page); } catch (e) { console.error(e); }
+  }
+
+  return (
+    <div>
+      <h1>{{.ModelName}}</h1>
+      <button onClick={openCreate}>+ New</button>
+
+      {showForm && (
+        <form onSubmit={handleSubmit}>
+{{range .FormInputs}}{{if .IsFK}}          <label>{{.FieldName}} <select value={form.{{.FieldName}} as number} onChange={e => setForm({...form, {{.FieldName}}: Number(e.target.value)})}{{if .Required}} required{{end}}>
+            <option value={0}>-- select --</option>
+            { {{.OptionsVar}}.map(opt => (<option key={opt.id} value={opt.id}>{opt.{{.LabelField}}}</option>))}
+          </select></label>
+{{else if .IsCheckbox}}          <label>{{.FieldName}} <input type="checkbox" checked={form.{{.FieldName}} as boolean} onChange={e => setForm({...form, {{.FieldName}}: e.target.checked})} /></label>
+{{else if .IsNumber}}          <label>{{.FieldName}} <input type="number" value={form.{{.FieldName}} as number} onChange={e => setForm({...form, {{.FieldName}}: Number(e.target.value)})}{{if .Required}} required{{end}} /></label>
+{{else}}          <label>{{.FieldName}} <input type="{{.InputType}}" value={form.{{.FieldName}} as string} onChange={e => setForm({...form, {{.FieldName}}: e.target.value})}{{if .Required}} required{{end}} /></label>
+{{end}}{{end}}          <button type="submit">{editing ? 'Save' : 'Create'}</button>
+          <button type="button" onClick={() => setShowForm(false)}>Cancel</button>
+        </form>
+      )}
+
+      <table>
+        <thead><tr><th>id</th>{{range .TableHeaders}}<th>{{.}}</th>{{end}}<th></th></tr></thead>
+        <tbody>
+          {items.map(item => (
+            <tr key={item.id}>
+              <td>{item.id}</td>
+{{range .TableCells}}              <td>{{.Expr}}</td>
+{{end}}              <td>
+                <button onClick={() => openEdit(item)}>Edit</button>
+                <button onClick={() => handleDelete(item.id)}>Del</button>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <div>
+        <button onClick={() => load(page - 1)} disabled={page <= 1}>Prev</button>
+        <span>{page} / {Math.ceil(total / limit) || 1} ({total} total)</span>
+        <button onClick={() => load(page + 1)} disabled={page * limit >= total}>Next</button>
+      </div>
+    </div>
+  );
+}

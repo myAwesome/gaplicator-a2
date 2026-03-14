@@ -1,0 +1,42 @@
+import type { {{.StructName}}, Create{{.StructName}}Input } from '../types/{{.Singular}}';
+
+const BASE = '/{{.PluralRaw}}';
+
+export interface Paginated{{.PluralName}} { data: {{.StructName}}[]; total: number; page: number; limit: number; }
+
+export async function list{{.PluralName}}(page = 1, limit = 20): Promise<Paginated{{.PluralName}}> {
+  const res = await fetch(`${BASE}?page=${page}&limit=${limit}`);
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+export async function get{{.StructName}}(id: number): Promise<{{.StructName}}> {
+  const res = await fetch(`${BASE}/${id}`);
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+export async function create{{.StructName}}(data: Create{{.StructName}}Input): Promise<{{.StructName}}> {
+  const res = await fetch(BASE, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+export async function update{{.StructName}}(id: number, data: Partial<Create{{.StructName}}Input>): Promise<{{.StructName}}> {
+  const res = await fetch(`${BASE}/${id}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+export async function delete{{.StructName}}(id: number): Promise<void> {
+  const res = await fetch(`${BASE}/${id}`, { method: 'DELETE' });
+  if (!res.ok) throw new Error(await res.text());
+}
