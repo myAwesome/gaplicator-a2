@@ -66,9 +66,13 @@ type Field struct {
 	Unique     bool   `yaml:"unique"`
 	Default    any    `yaml:"default"`
 	References string `yaml:"references"`
+	Index      bool   `yaml:"index"`
+	Label      string `yaml:"label"`
 }
 
 var validIdentRe = regexp.MustCompile(`^[a-z][a-z0-9_]*$`)
+
+var validAppNameRe = regexp.MustCompile(`^[a-z][a-z0-9_-]*$`)
 
 var validTypeRe = regexp.MustCompile(
 	`^(int|bigint|smallint|text|boolean|bool|date|datetime|timestamp|uuid|float|double|` +
@@ -104,9 +108,11 @@ func ValidateConfig(cfg *Config) []error {
 
 	if cfg.App.Name == "" {
 		errs = append(errs, fmt.Errorf("app.name is required"))
+	} else if !validAppNameRe.MatchString(cfg.App.Name) {
+		errs = append(errs, fmt.Errorf("app.name must be lowercase letters, digits, hyphens, or underscores"))
 	}
-	if cfg.App.Port == 0 {
-		errs = append(errs, fmt.Errorf("app.port is required"))
+	if cfg.App.Port < 1 || cfg.App.Port > 65535 {
+		errs = append(errs, fmt.Errorf("app.port must be between 1 and 65535"))
 	}
 	if cfg.Database.Host == "" {
 		errs = append(errs, fmt.Errorf("database.host is required"))
@@ -114,15 +120,40 @@ func ValidateConfig(cfg *Config) []error {
 	if cfg.Database.Name == "" {
 		errs = append(errs, fmt.Errorf("database.name is required"))
 	}
+	if cfg.Database.Port < 1 || cfg.Database.Port > 65535 {
+		errs = append(errs, fmt.Errorf("database.port must be between 1 and 65535"))
+	}
 	if len(cfg.Models) == 0 {
 		errs = append(errs, fmt.Errorf("at least one model is required"))
 	}
 
-	modelNames := make(map[string]bool, len(cfg.Models))
+	// Count model names to detect duplicates.
+	modelNameCount := make(map[string]int, len(cfg.Models))
 	for _, m := range cfg.Models {
 		if m.Name != "" {
-			modelNames[m.Name] = true
+			modelNameCount[m.Name]++
 		}
+	}
+	for name, count := range modelNameCount {
+		if count > 1 {
+			errs = append(errs, fmt.Errorf("duplicate model name %q", name))
+		}
+	}
+
+	// Build a field registry per model for reference validation.
+	modelFields := make(map[string]map[string]bool, len(cfg.Models))
+	for _, m := range cfg.Models {
+		if m.Name == "" {
+			continue
+		}
+		fields := make(map[string]bool, len(m.Fields)+1)
+		fields["id"] = true // auto-generated primary key
+		for _, f := range m.Fields {
+			if f.Name != "" {
+				fields[f.Name] = true
+			}
+		}
+		modelFields[m.Name] = fields
 	}
 
 	for mi, m := range cfg.Models {
@@ -164,8 +195,10 @@ func ValidateConfig(cfg *Config) []error {
 					errs = append(errs, fmt.Errorf("%s: references %q must be in \"model.field\" format", fprefix, f.References))
 				} else if !validIdentRe.MatchString(parts[0]) || !validIdentRe.MatchString(parts[1]) {
 					errs = append(errs, fmt.Errorf("%s: references %q identifiers must be lowercase snake_case", fprefix, f.References))
-				} else if !modelNames[parts[0]] {
+				} else if modelNameCount[parts[0]] == 0 {
 					errs = append(errs, fmt.Errorf("%s: references unknown model %q", fprefix, parts[0]))
+				} else if fields, ok := modelFields[parts[0]]; ok && !fields[parts[1]] {
+					errs = append(errs, fmt.Errorf("%s: references unknown field %q in model %q", fprefix, parts[1], parts[0]))
 				}
 			}
 		}
@@ -217,6 +250,11 @@ func tableSQL(m Model) string {
 		}
 	}
 	sb.WriteString("\n);\n")
+	for _, f := range m.Fields {
+		if f.Index && !f.Unique {
+			fmt.Fprintf(&sb, "CREATE INDEX IF NOT EXISTS idx_%s_%s ON %s (%s);\n", m.Name, f.Name, m.Name, f.Name)
+		}
+	}
 	return sb.String()
 }
 
@@ -349,6 +387,8 @@ func buildFieldTags(f Field) string {
 	}
 	if f.Unique {
 		parts = append(parts, "uniqueIndex")
+	} else if f.Index {
+		parts = append(parts, "index")
 	}
 	if f.Default != nil {
 		parts = append(parts, "default:"+formatDefault(f.Default))

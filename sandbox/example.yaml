@@ -15,12 +15,19 @@ models:
       - name: first_name
         type: varchar(100)
         required: true
+        label: "First Name"
       - name: last_name
         type: varchar(100)
         required: true
+        label: "Last Name"
       - name: email
         type: varchar(255)
         unique: true
+        label: "Email Address"
+      - name: enrolled_at
+        type: date
+        index: true
+        label: "Enrolled At"
 
   - name: subjects
     fields:
