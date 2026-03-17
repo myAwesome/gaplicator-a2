@@ -58,6 +58,14 @@ func isDatetimeType(sqlType string) bool {
 	return lower == "datetime" || lower == "timestamp"
 }
 
+// fieldLabel returns the display label for a field: Label if set, else Name.
+func fieldLabel(f Field) string {
+	if f.Label != "" {
+		return f.Label
+	}
+	return f.Name
+}
+
 // findLabelField returns the best display field name for a model (prefers "name"/"title", else first field).
 func findLabelField(m Model) string {
 	for _, f := range m.Fields {
@@ -243,6 +251,7 @@ type pagePayloadField struct {
 
 type pageFormInput struct {
 	FieldName  string
+	Label      string
 	IsFK       bool
 	IsCheckbox bool
 	IsNumber   bool
@@ -389,7 +398,7 @@ func GenerateReactPage(m Model, allModels []Model) string {
 	// ── FormInputs ────────────────────────────────────────────────────────
 	formInputs := make([]pageFormInput, len(m.Fields))
 	for i, f := range m.Fields {
-		fi := pageFormInput{FieldName: f.Name, Required: f.Required}
+		fi := pageFormInput{FieldName: f.Name, Label: fieldLabel(f), Required: f.Required}
 		if fk, isFk := fkByField[f.Name]; isFk {
 			fi.IsFK = true
 			fi.OptionsVar = fk.optionsVar
@@ -407,7 +416,7 @@ func GenerateReactPage(m Model, allModels []Model) string {
 	headers := make([]string, len(m.Fields))
 	cells := make([]pageTableCell, len(m.Fields))
 	for i, f := range m.Fields {
-		headers[i] = f.Name
+		headers[i] = fieldLabel(f)
 		if sqlTypeToTS(f.Type) == "boolean" {
 			cells[i] = pageTableCell{fmt.Sprintf("{item.%s ? 'yes' : 'no'}", f.Name)}
 		} else {

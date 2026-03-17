@@ -25,8 +25,8 @@ models:
 
 | Key | Type | Required | Description |
 |-----|------|----------|-------------|
-| `name` | string | yes | Application name. Used as the Go module name and React app title. |
-| `port` | int | yes | HTTP port the generated server listens on. |
+| `name` | string | yes | Application name. Used as the Go module name and React app title. Must match `^[a-z][a-z0-9_-]*$` (lowercase letters, digits, hyphens, underscores). |
+| `port` | int | yes | HTTP port the generated server listens on. Must be between 1 and 65535. |
 
 ---
 
@@ -36,7 +36,7 @@ models:
 |-----|------|----------|---------|-------------|
 | `host` | string | yes | — | PostgreSQL hostname. |
 | `name` | string | yes | — | Database name. |
-| `port` | int | no | `5432` | PostgreSQL port. |
+| `port` | int | no | `5432` | PostgreSQL port. Must be between 1 and 65535. |
 | `user` | string | no | `postgres` | Database user. |
 | `password` | string | no | `secret` | Database password. |
 
@@ -48,7 +48,7 @@ A list of data models. Each model maps to a database table and gets full CRUD ro
 
 | Key | Type | Required | Description |
 |-----|------|----------|-------------|
-| `name` | string | yes | Table name in plural snake_case (e.g. `blog_posts`). |
+| `name` | string | yes | Table name in plural snake_case (e.g. `blog_posts`). Must be unique across all models. |
 | `fields` | list | yes | At least one field required. |
 
 All models automatically include `id`, `created_at`, `updated_at`, and `deleted_at` (soft delete) — do not declare these manually.
@@ -62,7 +62,9 @@ All models automatically include `id`, `created_at`, `updated_at`, and `deleted_
 | `required` | bool | no | Adds `NOT NULL` constraint. Default: `false`. |
 | `unique` | bool | no | Adds `UNIQUE` constraint. Default: `false`. |
 | `default` | any | no | Column default value. |
-| `references` | string | no | Foreign key in `model.field` format (e.g. `users.id`). The referenced model must exist in the same config. |
+| `index` | bool | no | Creates a non-unique database index (`CREATE INDEX IF NOT EXISTS`). Ignored when `unique: true`. Default: `false`. |
+| `references` | string | no | Foreign key in `model.field` format (e.g. `users.id`). The referenced model **and field** must exist in the same config (`id` is always valid as it is auto-generated). |
+| `label` | string | no | Human-readable display name used in React form `<label>` elements and table column headers. Defaults to the field `name`. |
 
 #### Field types
 

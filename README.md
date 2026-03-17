@@ -24,33 +24,46 @@ gapp build <config.yaml> [-o <output-dir>]
 
 ```yaml
 app:
-  name: my-app   # used as Go module name
-  port: 8080
+  name: my-app   # lowercase letters, digits, hyphens, underscores; used as Go module name
+  port: 8080     # 1–65535
 
 database:
   host: localhost
-  port: 5432       # optional, default: 5432
+  port: 5432       # optional, default: 5432; must be 1–65535
   name: my_db
   user: postgres   # optional, default: postgres
   password: secret # optional, default: secret
 
 models:
-  - name: posts        # plural snake_case → table name
+  - name: posts        # plural snake_case → table name; must be unique
     fields:
       - name: title
         type: varchar(200)
         required: true
+        label: "Post Title"    # optional: shown in React form labels and table headers
       - name: published
         type: boolean
         default: false
+      - name: created_at
+        type: timestamp
+        index: true            # optional: creates a non-unique database index
       - name: author_id
         type: int
-        references: users.id   # FK → users table
+        references: users.id   # FK → must reference an existing model and field
 ```
 
 Supported field types: `int`, `bigint`, `smallint`, `text`, `boolean`, `bool`, `date`, `datetime`, `timestamp`, `uuid`, `float`, `double`, `varchar(N)`, `char(N)`, `decimal(P,S)`
 
-Field attributes: `required` (NOT NULL), `unique` (UNIQUE constraint), `default`, `references` (foreign key, e.g. `users.id`)
+Field attributes:
+
+| Attribute | Description |
+|-----------|-------------|
+| `required` | Adds `NOT NULL` constraint |
+| `unique` | Adds `UNIQUE` constraint |
+| `default` | Column default value |
+| `index` | Creates a non-unique index (`CREATE INDEX`) |
+| `references` | Foreign key in `model.field` format (e.g. `users.id`) |
+| `label` | Human-readable label for React form inputs and table headers |
 
 All models include auto-managed `id`, `created_at`, `updated_at`, and `deleted_at` (soft delete) fields via GORM.
 

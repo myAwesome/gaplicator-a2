@@ -79,21 +79,21 @@ export default function {{.ComponentName}}() {
         <div className="form-card">
           <form onSubmit={handleSubmit}>
 {{range .FormInputs}}{{if .IsFK}}            <div className="form-group">
-              <label className="form-label">{{.FieldName}}</label>
+              <label className="form-label">{{.Label}}</label>
               <select className="form-select" value={form.{{.FieldName}} as number} onChange={e => setForm({...form, {{.FieldName}}: Number(e.target.value)})}{{if .Required}} required{{end}}>
                 <option value={0}>-- select --</option>
                 { {{.OptionsVar}}.map(opt => (<option key={opt.id} value={opt.id}>{opt.{{.LabelField}}}</option>))}
               </select>
             </div>
 {{else if .IsCheckbox}}            <div className="form-group form-group--checkbox">
-              <label className="form-label"><input type="checkbox" checked={form.{{.FieldName}} as boolean} onChange={e => setForm({...form, {{.FieldName}}: e.target.checked})} /> {{.FieldName}}</label>
+              <label className="form-label"><input type="checkbox" checked={form.{{.FieldName}} as boolean} onChange={e => setForm({...form, {{.FieldName}}: e.target.checked})} /> {{.Label}}</label>
             </div>
 {{else if .IsNumber}}            <div className="form-group">
-              <label className="form-label">{{.FieldName}}</label>
+              <label className="form-label">{{.Label}}</label>
               <input className="form-input" type="number" value={form.{{.FieldName}} as number} onChange={e => setForm({...form, {{.FieldName}}: Number(e.target.value)})}{{if .Required}} required{{end}} />
             </div>
 {{else}}            <div className="form-group">
-              <label className="form-label">{{.FieldName}}</label>
+              <label className="form-label">{{.Label}}</label>
               <input className="form-input" type="{{.InputType}}" value={form.{{.FieldName}} as string} onChange={e => setForm({...form, {{.FieldName}}: e.target.value})}{{if .Required}} required{{end}} />
             </div>
 {{end}}{{end}}            <div className="form-actions">
