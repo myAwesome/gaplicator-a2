@@ -29,10 +29,19 @@ func list{{.Singular}}(db *gorm.DB) gin.HandlerFunc {
 			limit = 20
 		}
 		offset := (page - 1) * limit
+		sortBy := c.DefaultQuery("sort_by", "id")
+		sortDir := c.DefaultQuery("sort_dir", "desc")
+		allowed{{.Singular}} := map[string]bool{ {{range .SortColumns}}"{{.}}": true, {{end}} }
+		if !allowed{{.Singular}}[sortBy] {
+			sortBy = "id"
+		}
+		if sortDir != "asc" && sortDir != "desc" {
+			sortDir = "desc"
+		}
 		var total int64
 		db.Model(&{{.Type}}{}).Count(&total)
 		var rows []{{.Type}}
-		if err := db.Offset(offset).Limit(limit).Find(&rows).Error; err != nil {
+		if err := db.Order(sortBy + " " + sortDir).Offset(offset).Limit(limit).Find(&rows).Error; err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}

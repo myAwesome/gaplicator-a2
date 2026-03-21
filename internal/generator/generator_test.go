@@ -653,9 +653,9 @@ func TestGenerateReactPage_Table(t *testing.T) {
 	out := GenerateReactPage(clientTestModel, nil)
 
 	for _, want := range []string{
-		"<th>id</th>",
-		"<th>first_name</th>",
-		"<th>last_name</th>",
+		"handleSort('id')",
+		"handleSort('first_name')",
+		"handleSort('last_name')",
 		"item.id",
 		"item.first_name",
 		"{item.present ? 'yes' : 'no'}",
@@ -904,7 +904,7 @@ func TestGenerateGinRoutes_Pagination(t *testing.T) {
 	for _, want := range []string{
 		`c.DefaultQuery("page", "1")`,
 		`c.DefaultQuery("limit", "20")`,
-		`db.Offset(offset).Limit(limit).Find(&rows)`,
+		`db.Order(sortBy + " " + sortDir).Offset(offset).Limit(limit).Find(&rows)`,
 		`db.Model(&models.Item{}).Count(&total)`,
 		`"data": rows`,
 		`"total": total`,
@@ -942,7 +942,7 @@ func TestGenerateReactPage_Pagination(t *testing.T) {
 		"setTotal",
 		"const limit = 20",
 		"load(1)",
-		"load(p: number)",
+		"load(p: number,",
 		"res.data",
 		"res.total",
 		"Prev",

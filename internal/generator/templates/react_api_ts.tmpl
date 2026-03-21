@@ -4,8 +4,8 @@ const BASE = '/{{.PluralRaw}}';
 
 export interface Paginated{{.PluralName}} { data: {{.StructName}}[]; total: number; page: number; limit: number; }
 
-export async function list{{.PluralName}}(page = 1, limit = 20): Promise<Paginated{{.PluralName}}> {
-  const res = await fetch(`${BASE}?page=${page}&limit=${limit}`);
+export async function list{{.PluralName}}(page = 1, limit = 20, sortBy = 'id', sortDir: 'asc' | 'desc' = 'desc'): Promise<Paginated{{.PluralName}}> {
+  const res = await fetch(`${BASE}?page=${page}&limit=${limit}&sort_by=${sortBy}&sort_dir=${sortDir}`);
   if (!res.ok) throw new Error(await res.text());
   return res.json();
 }

@@ -589,11 +589,12 @@ func GenerateShutdownScript() (string, error) {
 }
 
 type ginModelData struct {
-	Name     string
-	Singular string
-	Type     string
-	Base     string
-	BaseID   string
+	Name        string
+	Singular    string
+	Type        string
+	Base        string
+	BaseID      string
+	SortColumns []string
 }
 
 func GenerateGinRoutes(models []Model, pkgName string, modelsImport string) string {
@@ -605,12 +606,17 @@ func GenerateGinRoutes(models []Model, pkgName string, modelsImport string) stri
 	ginModels := make([]ginModelData, 0, len(models))
 	for _, m := range models {
 		s := toPascalCase(toSingular(m.Name))
+		sortCols := []string{"id", "created_at", "updated_at"}
+		for _, f := range m.Fields {
+			sortCols = append(sortCols, f.Name)
+		}
 		ginModels = append(ginModels, ginModelData{
-			Name:     m.Name,
-			Singular: s,
-			Type:     modPkg + "." + s,
-			Base:     "/" + m.Name,
-			BaseID:   "/" + m.Name + "/:id",
+			Name:        m.Name,
+			Singular:    s,
+			Type:        modPkg + "." + s,
+			Base:        "/" + m.Name,
+			BaseID:      "/" + m.Name + "/:id",
+			SortColumns: sortCols,
 		})
 	}
 

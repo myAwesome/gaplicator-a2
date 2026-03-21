@@ -272,6 +272,11 @@ type pageTableCell struct {
 	Expr string
 }
 
+type pageTableColumn struct {
+	Label string
+	Key   string
+}
+
 type reactPageData struct {
 	StructName     string
 	Singular       string
@@ -285,7 +290,7 @@ type reactPageData struct {
 	NeedsPayload   bool
 	PayloadFields  []pagePayloadField
 	FormInputs     []pageFormInput
-	TableHeaders   []string
+	TableColumns   []pageTableColumn
 	TableCells     []pageTableCell
 }
 
@@ -426,11 +431,11 @@ func GenerateReactPage(m Model, allModels []Model) string {
 		formInputs[i] = fi
 	}
 
-	// ── TableHeaders / TableCells ─────────────────────────────────────────
-	headers := make([]string, len(m.Fields))
+	// ── TableColumns / TableCells ─────────────────────────────────────────
+	columns := make([]pageTableColumn, len(m.Fields))
 	cells := make([]pageTableCell, len(m.Fields))
 	for i, f := range m.Fields {
-		headers[i] = fieldLabel(f)
+		columns[i] = pageTableColumn{Label: fieldLabel(f), Key: f.Name}
 		if fk, isFk := fkByField[f.Name]; isFk {
 			labelF := f.DisplayField
 			if labelF == "" {
@@ -463,7 +468,7 @@ func GenerateReactPage(m Model, allModels []Model) string {
 		NeedsPayload:   needsPayload,
 		PayloadFields:  payloadFields,
 		FormInputs:     formInputs,
-		TableHeaders:   headers,
+		TableColumns:   columns,
 		TableCells:     cells,
 	}
 

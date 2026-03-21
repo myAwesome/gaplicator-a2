@@ -16,6 +16,8 @@ export default function {{.ComponentName}}() {
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
   const limit = 20;
+  const [sortBy, setSortBy] = useState('id');
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
 {{range .FKImports}}  const [{{.OptionsVar}}, {{.SetterVar}}] = useState<{{.RefStruct}}[]>([]);
 {{end}}
 {{if .HasFKs}}  useEffect(() => { load(1); loadRefs(); }, []);
@@ -27,13 +29,20 @@ export default function {{.ComponentName}}() {
 {{end}}    } catch (e) { console.error(e); }
   }
 
-{{end}}  async function load(p: number) {
+{{end}}  async function load(p: number, sb = sortBy, sd = sortDir) {
     try {
-      const res = await list{{.PluralName}}(p, limit);
+      const res = await list{{.PluralName}}(p, limit, sb, sd);
       setItems(res.data);
       setTotal(res.total);
       setPage(p);
     } catch (e) { console.error(e); }
+  }
+
+  function handleSort(col: string) {
+    const newDir = col === sortBy ? (sortDir === 'asc' ? 'desc' : 'asc') : 'desc';
+    setSortBy(col);
+    setSortDir(newDir);
+    load(1, col, newDir);
   }
 
   function openCreate() {
@@ -112,7 +121,11 @@ export default function {{.ComponentName}}() {
       )}
 
       <table className="data-table">
-        <thead><tr><th>id</th>{{range .TableHeaders}}<th>{{.}}</th>{{end}}<th></th></tr></thead>
+        <thead><tr>
+          <th className={`sortable${sortBy === 'id' ? ' sorted' : ''}`} onClick={() => handleSort('id')}>id {sortBy === 'id' && (sortDir === 'asc' ? '▲' : '▼')}</th>
+          {{range .TableColumns}}<th className={`sortable${sortBy === '{{.Key}}' ? ' sorted' : ''}`} onClick={() => handleSort('{{.Key}}')}>{{.Label}} {sortBy === '{{.Key}}' && (sortDir === 'asc' ? '▲' : '▼')}</th>
+          {{end}}<th></th>
+        </tr></thead>
         <tbody>
           {items.map(item => (
             <tr key={item.id}>
