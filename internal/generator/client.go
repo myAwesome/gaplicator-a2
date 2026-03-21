@@ -429,6 +429,10 @@ func GenerateReactPage(m Model, allModels []Model) string {
 			cells[i] = pageTableCell{fmt.Sprintf("{%s.find(o => o.id === item.%s)?.%s ?? String(item.%s)}", fk.optionsVar, f.Name, labelF, f.Name)}
 		} else if sqlTypeToTS(f.Type) == "boolean" {
 			cells[i] = pageTableCell{fmt.Sprintf("{item.%s ? 'yes' : 'no'}", f.Name)}
+		} else if isDateType(f.Type) {
+			cells[i] = pageTableCell{fmt.Sprintf("{item.%s ? (item.%s as string).slice(0, 10) : ''}", f.Name, f.Name)}
+		} else if isDatetimeType(f.Type) {
+			cells[i] = pageTableCell{fmt.Sprintf("{item.%s ? (item.%s as string).slice(0, 16).replace('T', ' ') : ''}", f.Name, f.Name)}
 		} else {
 			cells[i] = pageTableCell{"{item." + f.Name + "}"}
 		}

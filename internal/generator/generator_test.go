@@ -1156,6 +1156,30 @@ func TestGenerateReactPage_FKTable_DefaultLabel(t *testing.T) {
 	}
 }
 
+func TestGenerateReactPage_DateTableCell(t *testing.T) {
+	m := Model{
+		Name: "events",
+		Fields: []Field{
+			{Name: "day", Type: "date", Required: true},
+			{Name: "starts_at", Type: "datetime", Required: true},
+			{Name: "ends_at", Type: "timestamp"},
+		},
+	}
+	out := GenerateReactPage(m, nil)
+
+	// date cell: slice to 10 chars (YYYY-MM-DD)
+	if !strings.Contains(out, `item.day ? (item.day as string).slice(0, 10) : ''`) {
+		t.Error("expected slice(0, 10) for date field table cell")
+	}
+	// datetime cell: slice to 16 and replace T with space (YYYY-MM-DD HH:MM)
+	if !strings.Contains(out, `item.starts_at ? (item.starts_at as string).slice(0, 16).replace('T', ' ') : ''`) {
+		t.Error("expected slice(0,16).replace for datetime field table cell")
+	}
+	if !strings.Contains(out, `item.ends_at ? (item.ends_at as string).slice(0, 16).replace('T', ' ') : ''`) {
+		t.Error("expected slice(0,16).replace for timestamp field table cell")
+	}
+}
+
 func TestGenerateShutdownScript_DockerDown(t *testing.T) {
 	out, err := GenerateShutdownScript()
 	if err != nil {
