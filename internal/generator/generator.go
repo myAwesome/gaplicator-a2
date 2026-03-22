@@ -55,8 +55,9 @@ type DatabaseConfig struct {
 }
 
 type Model struct {
-	Name   string  `yaml:"name"`
-	Fields []Field `yaml:"fields"`
+	Name       string   `yaml:"name"`
+	Fields     []Field  `yaml:"fields"`
+	ManyToMany []string `yaml:"many_to_many"`
 }
 
 type Field struct {
@@ -173,6 +174,18 @@ func ValidateConfig(cfg *Config) []error {
 			errs = append(errs, fmt.Errorf("%s: at least one field is required", prefix))
 		}
 
+		for _, other := range m.ManyToMany {
+			if other == "" {
+				errs = append(errs, fmt.Errorf("%s: many_to_many entry must not be empty", prefix))
+			} else if !validIdentRe.MatchString(other) {
+				errs = append(errs, fmt.Errorf("%s: many_to_many entry %q must be lowercase snake_case", prefix, other))
+			} else if other == m.Name {
+				errs = append(errs, fmt.Errorf("%s: many_to_many cannot reference itself", prefix))
+			} else if modelNameCount[other] == 0 {
+				errs = append(errs, fmt.Errorf("%s: many_to_many references unknown model %q", prefix, other))
+			}
+		}
+
 		for fi, f := range m.Fields {
 			fprefix := fmt.Sprintf("%s field[%d]", prefix, fi)
 			if f.Name != "" {
@@ -229,12 +242,22 @@ func GenerateMigrationUp(models []Model) string {
 		}
 		sb.WriteString(tableSQL(m))
 	}
+	joins := collectJoinTables(models)
+	for _, j := range joins {
+		sb.WriteString("\n")
+		sb.WriteString(joinTableSQL(j))
+	}
 	return sb.String()
 }
 
 func GenerateMigrationDown(models []Model) string {
 	sorted := topoSort(models)
 	var sb strings.Builder
+	// Drop join tables first (they reference the main tables).
+	joins := collectJoinTables(models)
+	for i := len(joins) - 1; i >= 0; i-- {
+		fmt.Fprintf(&sb, "DROP TABLE IF EXISTS %s;\n", joins[i].Table)
+	}
 	for i := len(sorted) - 1; i >= 0; i-- {
 		fmt.Fprintf(&sb, "DROP TABLE IF EXISTS %s;\n", sorted[i].Name)
 	}
@@ -329,6 +352,60 @@ func topoSort(models []Model) []Model {
 		visit(m.Name)
 	}
 	return result
+}
+
+// joinTableName returns the canonical join table name for models a and b
+// (names sorted alphabetically and joined with "_").
+func joinTableName(a, b string) string {
+	if a > b {
+		a, b = b, a
+	}
+	return a + "_" + b
+}
+
+type joinTableDef struct {
+	Table string
+	AName string
+	BName string
+	ACol  string
+	BCol  string
+}
+
+// collectJoinTables returns deduplicated join table definitions for all M2M pairs.
+func collectJoinTables(models []Model) []joinTableDef {
+	seen := map[string]bool{}
+	var result []joinTableDef
+	for _, m := range models {
+		for _, other := range m.ManyToMany {
+			name := joinTableName(m.Name, other)
+			if seen[name] {
+				continue
+			}
+			seen[name] = true
+			a, b := m.Name, other
+			if a > b {
+				a, b = b, a
+			}
+			result = append(result, joinTableDef{
+				Table: name,
+				AName: a,
+				BName: b,
+				ACol:  toSingular(a) + "_id",
+				BCol:  toSingular(b) + "_id",
+			})
+		}
+	}
+	return result
+}
+
+func joinTableSQL(j joinTableDef) string {
+	return fmt.Sprintf(
+		"CREATE TABLE IF NOT EXISTS %s (\n    %s INT NOT NULL REFERENCES %s(id) ON DELETE CASCADE,\n    %s INT NOT NULL REFERENCES %s(id) ON DELETE CASCADE,\n    PRIMARY KEY (%s, %s)\n);\n",
+		j.Table,
+		j.ACol, j.AName,
+		j.BCol, j.BName,
+		j.ACol, j.BCol,
+	)
 }
 
 func toSingular(s string) string {
@@ -429,9 +506,16 @@ type gormFieldData struct {
 	AssocTags  string
 }
 
+type gormM2MField struct {
+	FieldName string
+	SliceType string
+	Tags      string
+}
+
 type gormModelData struct {
 	StructName string
 	Fields     []gormFieldData
+	M2MFields  []gormM2MField
 }
 
 func GenerateGORMModels(models []Model, pkgName string) string {
@@ -472,7 +556,19 @@ func GenerateGORMModels(models []Model, pkgName string) string {
 			}
 			fields = append(fields, fd)
 		}
-		modelData = append(modelData, gormModelData{StructName: structName, Fields: fields})
+		var m2mFields []gormM2MField
+		for _, otherName := range m.ManyToMany {
+			if otherStruct, ok := structNames[otherName]; ok {
+				jt := joinTableName(m.Name, otherName)
+				tags := fmt.Sprintf(`gorm:"many2many:%s;" json:"%s,omitempty"`, jt, otherName)
+				m2mFields = append(m2mFields, gormM2MField{
+					FieldName: toPascalCase(otherName),
+					SliceType: "[]" + otherStruct,
+					Tags:      tags,
+				})
+			}
+		}
+		modelData = append(modelData, gormModelData{StructName: structName, Fields: fields, M2MFields: m2mFields})
 	}
 
 	data := struct {
@@ -594,6 +690,12 @@ type ginFilterColumn struct {
 	IsBool    bool
 }
 
+type ginM2MRelation struct {
+	AssocField string
+	AssocType  string
+	IDsField   string
+}
+
 type ginModelData struct {
 	Name          string
 	Singular      string
@@ -604,6 +706,8 @@ type ginModelData struct {
 	SearchColumns []string
 	FilterColumns []ginFilterColumn
 	HasSearch     bool
+	M2MRelations  []ginM2MRelation
+	HasM2M        bool
 }
 
 func GenerateGinRoutes(models []Model, pkgName string, modelsImport string) string {
@@ -613,6 +717,7 @@ func GenerateGinRoutes(models []Model, pkgName string, modelsImport string) stri
 	}
 
 	hasAnySearch := false
+	hasAnyM2M := false
 	ginModels := make([]ginModelData, 0, len(models))
 	for _, m := range models {
 		s := toPascalCase(toSingular(m.Name))
@@ -636,6 +741,18 @@ func GenerateGinRoutes(models []Model, pkgName string, modelsImport string) stri
 		if hasSearch {
 			hasAnySearch = true
 		}
+		var m2mRelations []ginM2MRelation
+		for _, other := range m.ManyToMany {
+			otherStruct := toPascalCase(toSingular(other))
+			m2mRelations = append(m2mRelations, ginM2MRelation{
+				AssocField: toPascalCase(other),
+				AssocType:  modPkg + "." + otherStruct,
+				IDsField:   toSingular(other) + "_ids",
+			})
+		}
+		if len(m2mRelations) > 0 {
+			hasAnyM2M = true
+		}
 		ginModels = append(ginModels, ginModelData{
 			Name:          m.Name,
 			Singular:      s,
@@ -646,6 +763,8 @@ func GenerateGinRoutes(models []Model, pkgName string, modelsImport string) stri
 			SearchColumns: searchCols,
 			FilterColumns: filterCols,
 			HasSearch:     hasSearch,
+			M2MRelations:  m2mRelations,
+			HasM2M:        len(m2mRelations) > 0,
 		})
 	}
 
@@ -653,8 +772,9 @@ func GenerateGinRoutes(models []Model, pkgName string, modelsImport string) stri
 		PkgName      string
 		ModelsImport string
 		HasSearch    bool
+		HasAnyM2M    bool
 		Models       []ginModelData
-	}{PkgName: pkgName, ModelsImport: modelsImport, HasSearch: hasAnySearch, Models: ginModels}
+	}{PkgName: pkgName, ModelsImport: modelsImport, HasSearch: hasAnySearch, HasAnyM2M: hasAnyM2M, Models: ginModels}
 
 	var buf strings.Builder
 	template.Must(template.New("gin_routes").Parse(ginRoutesTmpl)).Execute(&buf, data) //nolint:errcheck

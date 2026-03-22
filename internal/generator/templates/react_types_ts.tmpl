@@ -1,6 +1,8 @@
-export interface {{.StructName}} {
+{{range .M2MImports}}import type { {{.RefType}} } from '{{.ImportPath}}';
+{{end}}export interface {{.StructName}} {
   id: number;
 {{range .Fields}}  {{.Name}}{{if not .Required}}?{{end}}: {{.TSType}};
+{{end}}{{range .M2MFields}}  {{.FieldName}}?: {{.TSType}}[];
 {{end}}  created_at: string;
   updated_at: string;
   deleted_at?: string;
@@ -8,4 +10,5 @@ export interface {{.StructName}} {
 
 export type Create{{.StructName}}Input = {
 {{range .Fields}}  {{.Name}}: {{.TSType}};
+{{end}}{{range .M2MIDFields}}  {{.IDsField}}: number[];
 {{end}}};

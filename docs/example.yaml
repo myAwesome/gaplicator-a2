@@ -11,6 +11,7 @@ database:
 
 models:
   - name: students
+    many_to_many: [courses]
     fields:
       - name: first_name
         type: varchar(100)
@@ -28,6 +29,17 @@ models:
         type: date
         index: true
         label: "Enrolled At"
+
+  - name: courses
+    fields:
+      - name: name
+        type: varchar(200)
+        required: true
+        label: "Course Name"
+      - name: code
+        type: varchar(20)
+        unique: true
+        label: "Course Code"
 
   - name: subjects
     fields:

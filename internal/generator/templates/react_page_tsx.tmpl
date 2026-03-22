@@ -3,9 +3,12 @@ import type { {{.StructName}}, Create{{.StructName}}Input } from '../types/{{.Si
 import { list{{.PluralName}}, create{{.StructName}}, update{{.StructName}}, delete{{.StructName}} } from '../api/{{.Singular}}';
 {{range .FKImports}}import type { {{.RefStruct}} } from '../types/{{.RefSingular}}';
 import { list{{.RefPlural}} } from '../api/{{.RefSingular}}';
+{{end}}{{range .M2MRelations}}import type { {{.RefStruct}} } from '../types/{{.RefSingular}}';
+import { list{{.RefPlural}} } from '../api/{{.RefSingular}}';
 {{end}}
 const EMPTY_FORM: Create{{.StructName}}Input = {
 {{range .FormFields}}  {{.Name}}: {{.Default}},
+{{end}}{{range .M2MRelations}}  {{.IDsField}}: [],
 {{end}}};
 
 export default function {{.ComponentName}}() {
@@ -21,13 +24,15 @@ export default function {{.ComponentName}}() {
 {{if .HasFilters}}  const [q, setQ] = useState('');
   const [filters, setFilters] = useState<Record<string, string>>({});
 {{end}}{{range .FKImports}}  const [{{.OptionsVar}}, {{.SetterVar}}] = useState<{{.RefStruct}}[]>([]);
+{{end}}{{range .M2MRelations}}  const [{{.OptionsVar}}, {{.SetterVar}}] = useState<{{.RefStruct}}[]>([]);
 {{end}}
-{{if .HasFKs}}  useEffect(() => { load(1); loadRefs(); }, []);
+{{if .HasRefs}}  useEffect(() => { load(1); loadRefs(); }, []);
 {{else}}  useEffect(() => { load(1); }, []);
 {{end}}
-{{if .HasFKs}}  async function loadRefs() {
+{{if .HasRefs}}  async function loadRefs() {
     try {
 {{range .FKImports}}      {{.SetterVar}}((await list{{.RefPlural}}(1, 1000)).data);
+{{end}}{{range .M2MRelations}}      {{.SetterVar}}((await list{{.RefPlural}}(1, 1000)).data);
 {{end}}    } catch (e) { console.error(e); }
   }
 
@@ -71,6 +76,7 @@ export default function {{.ComponentName}}() {
     setEditing(item);
     setForm({
 {{range .OpenEditFields}}      {{.Name}}: {{.Expr}},
+{{end}}{{range .M2MRelations}}      {{.IDsField}}: (item.{{.AssocField}} ?? []).map((r: {{.RefStruct}}) => r.id),
 {{end}}    });
     setShowForm(true);
   }
@@ -147,7 +153,15 @@ export default function {{.ComponentName}}() {
               <label className="form-label">{{.Label}}</label>
               <input className="form-input" type="{{.InputType}}" value={form.{{.FieldName}} as string} onChange={e => setForm({...form, {{.FieldName}}: e.target.value})}{{if .Required}} required{{end}} />
             </div>
-{{end}}{{end}}            <div className="form-actions">
+{{end}}{{end}}{{range .M2MRelations}}            <div className="form-group">
+              <label className="form-label">{{.Label}}</label>
+              <select multiple className="form-select form-select--multi"
+                value={((form.{{.IDsField}} ?? []) as number[]).map(String)}
+                onChange={e => setForm({...form, {{.IDsField}}: Array.from(e.target.selectedOptions).map(o => Number(o.value))})}>
+                { {{.OptionsVar}}.map(opt => (<option key={opt.id} value={opt.id}>{opt.{{.LabelField}}}</option>))}
+              </select>
+            </div>
+{{end}}            <div className="form-actions">
               <button type="submit" className="btn btn-primary">{editing ? 'Save' : 'Create'}</button>
               <button type="button" className="btn" onClick={() => setShowForm(false)}>Cancel</button>
             </div>
@@ -159,6 +173,7 @@ export default function {{.ComponentName}}() {
         <thead><tr>
           <th className={`sortable${sortBy === 'id' ? ' sorted' : ''}`} onClick={() => handleSort('id')}>id {sortBy === 'id' && (sortDir === 'asc' ? '▲' : '▼')}</th>
           {{range .TableColumns}}<th className={`sortable${sortBy === '{{.Key}}' ? ' sorted' : ''}`} onClick={() => handleSort('{{.Key}}')}>{{.Label}} {sortBy === '{{.Key}}' && (sortDir === 'asc' ? '▲' : '▼')}</th>
+          {{end}}{{range .M2MRelations}}<th>{{.Label}}</th>
           {{end}}<th></th>
         </tr></thead>
         <tbody>
@@ -166,6 +181,7 @@ export default function {{.ComponentName}}() {
             <tr key={item.id}>
               <td>{item.id}</td>
 {{range .TableCells}}              <td>{{.Expr}}</td>
+{{end}}{{range .M2MRelations}}              <td>{(item.{{.AssocField}} ?? []).map((r: {{.RefStruct}}) => <span key={r.id} className="chip">{r.{{.LabelField}}}</span>)}</td>
 {{end}}              <td>
                 <div className="row-actions">
                   <button className="btn btn-sm" onClick={() => openEdit(item)}>Edit</button>

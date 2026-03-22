@@ -550,7 +550,7 @@ var clientTestModel = Model{
 }
 
 func TestGenerateReactTypes_Interface(t *testing.T) {
-	out := GenerateReactTypes(clientTestModel)
+	out := GenerateReactTypes(clientTestModel, nil)
 
 	for _, want := range []string{
 		"export interface Student {",
@@ -568,7 +568,7 @@ func TestGenerateReactTypes_Interface(t *testing.T) {
 }
 
 func TestGenerateReactTypes_InputType(t *testing.T) {
-	out := GenerateReactTypes(clientTestModel)
+	out := GenerateReactTypes(clientTestModel, nil)
 
 	if !strings.Contains(out, "export type CreateStudentInput = {") {
 		t.Error("missing CreateStudentInput type")
@@ -1307,7 +1307,7 @@ func TestGenerateReactTypes_EnumFieldIsString(t *testing.T) {
 			{Name: "status", Type: "enum", Values: []string{"draft", "published"}},
 		},
 	}
-	out := GenerateReactTypes(m)
+	out := GenerateReactTypes(m, nil)
 
 	if !strings.Contains(out, "status?: string") {
 		t.Errorf("expected 'status?: string' for optional enum field in TypeScript interface, got:\n%s", out)
@@ -1549,5 +1549,266 @@ func TestGenerateShutdownScript_DockerDown(t *testing.T) {
 	}
 	if !strings.Contains(out, "docker compose down") {
 		t.Error("expected 'docker compose down' in shutdown script")
+	}
+}
+
+// ── Many-to-many tests ────────────────────────────────────────────────────────
+
+var m2mTestModels = []Model{
+	{
+		Name:       "students",
+		ManyToMany: []string{"courses"},
+		Fields: []Field{
+			{Name: "name", Type: "varchar(100)", Required: true},
+		},
+	},
+	{
+		Name:   "courses",
+		Fields: []Field{{Name: "name", Type: "varchar(200)", Required: true}},
+	},
+}
+
+// ── ValidateConfig M2M ────────────────────────────────────────────────────────
+
+func TestValidateConfig_M2M_Valid(t *testing.T) {
+	cfg := &Config{
+		App:      AppConfig{Name: "myapp", Port: 8080},
+		Database: DatabaseConfig{Host: "localhost", Name: "db", Port: 5432},
+		Models:   m2mTestModels,
+	}
+	if errs := ValidateConfig(cfg); len(errs) != 0 {
+		t.Errorf("expected no errors, got: %v", errs)
+	}
+}
+
+func TestValidateConfig_M2M_UnknownModel(t *testing.T) {
+	cfg := &Config{
+		App:      AppConfig{Name: "myapp", Port: 8080},
+		Database: DatabaseConfig{Host: "localhost", Name: "db", Port: 5432},
+		Models: []Model{
+			{Name: "students", ManyToMany: []string{"unknown"}, Fields: []Field{{Name: "name", Type: "text"}}},
+		},
+	}
+	errs := ValidateConfig(cfg)
+	if len(errs) == 0 {
+		t.Fatal("expected error for M2M referencing unknown model")
+	}
+	if !strings.Contains(errs[0].Error(), "unknown model") && !strings.Contains(errs[0].Error(), "unknown") {
+		t.Errorf("unexpected error: %v", errs[0])
+	}
+}
+
+func TestValidateConfig_M2M_SelfReference(t *testing.T) {
+	cfg := &Config{
+		App:      AppConfig{Name: "myapp", Port: 8080},
+		Database: DatabaseConfig{Host: "localhost", Name: "db", Port: 5432},
+		Models: []Model{
+			{Name: "students", ManyToMany: []string{"students"}, Fields: []Field{{Name: "name", Type: "text"}}},
+		},
+	}
+	errs := ValidateConfig(cfg)
+	if len(errs) == 0 {
+		t.Fatal("expected error for M2M self-reference")
+	}
+	if !strings.Contains(errs[0].Error(), "cannot reference itself") {
+		t.Errorf("unexpected error: %v", errs[0])
+	}
+}
+
+// ── Migration M2M ─────────────────────────────────────────────────────────────
+
+func TestGenerateMigrationUp_JoinTable(t *testing.T) {
+	out := GenerateMigrationUp(m2mTestModels)
+	if !strings.Contains(out, "CREATE TABLE IF NOT EXISTS courses_students") {
+		t.Errorf("expected join table 'courses_students' in migration up:\n%s", out)
+	}
+	if !strings.Contains(out, "course_id INT NOT NULL REFERENCES courses(id) ON DELETE CASCADE") {
+		t.Errorf("expected course_id FK in join table:\n%s", out)
+	}
+	if !strings.Contains(out, "student_id INT NOT NULL REFERENCES students(id) ON DELETE CASCADE") {
+		t.Errorf("expected student_id FK in join table:\n%s", out)
+	}
+	if !strings.Contains(out, "PRIMARY KEY (course_id, student_id)") {
+		t.Errorf("expected PRIMARY KEY in join table:\n%s", out)
+	}
+}
+
+func TestGenerateMigrationUp_JoinTable_AlphaOrder(t *testing.T) {
+	// Whether declared as students->courses or courses->students, join table name is alphabetical.
+	models1 := []Model{
+		{Name: "students", ManyToMany: []string{"courses"}, Fields: []Field{{Name: "n", Type: "text"}}},
+		{Name: "courses", Fields: []Field{{Name: "n", Type: "text"}}},
+	}
+	models2 := []Model{
+		{Name: "courses", ManyToMany: []string{"students"}, Fields: []Field{{Name: "n", Type: "text"}}},
+		{Name: "students", Fields: []Field{{Name: "n", Type: "text"}}},
+	}
+	out1 := GenerateMigrationUp(models1)
+	out2 := GenerateMigrationUp(models2)
+	for _, out := range []string{out1, out2} {
+		if !strings.Contains(out, "courses_students") {
+			t.Errorf("expected join table name 'courses_students':\n%s", out)
+		}
+	}
+}
+
+func TestGenerateMigrationUp_JoinTable_Deduplicated(t *testing.T) {
+	// Both models declare the same M2M; only one join table should appear.
+	models := []Model{
+		{Name: "students", ManyToMany: []string{"courses"}, Fields: []Field{{Name: "n", Type: "text"}}},
+		{Name: "courses", ManyToMany: []string{"students"}, Fields: []Field{{Name: "n", Type: "text"}}},
+	}
+	out := GenerateMigrationUp(models)
+	count := strings.Count(out, "CREATE TABLE IF NOT EXISTS courses_students")
+	if count != 1 {
+		t.Errorf("expected join table to appear exactly once, got %d:\n%s", count, out)
+	}
+}
+
+func TestGenerateMigrationDown_JoinTableFirst(t *testing.T) {
+	out := GenerateMigrationDown(m2mTestModels)
+	joinIdx := strings.Index(out, "DROP TABLE IF EXISTS courses_students")
+	mainIdx := strings.Index(out, "DROP TABLE IF EXISTS students")
+	if joinIdx == -1 {
+		t.Fatalf("expected DROP for join table in migration down:\n%s", out)
+	}
+	if mainIdx == -1 {
+		t.Fatalf("expected DROP for students in migration down:\n%s", out)
+	}
+	if joinIdx > mainIdx {
+		t.Errorf("join table should be dropped before main tables:\n%s", out)
+	}
+}
+
+// ── GORM model M2M ────────────────────────────────────────────────────────────
+
+func TestGenerateGORMModels_M2M_Field(t *testing.T) {
+	out := GenerateGORMModels(m2mTestModels, "models")
+	if !strings.Contains(out, "[]Course") {
+		t.Errorf("expected '[]Course' M2M field in Student struct:\n%s", out)
+	}
+	if !strings.Contains(out, `many2many:courses_students`) {
+		t.Errorf("expected 'many2many:courses_students' GORM tag:\n%s", out)
+	}
+	if !strings.Contains(out, `json:"courses,omitempty"`) {
+		t.Errorf("expected json:\"courses,omitempty\" tag:\n%s", out)
+	}
+}
+
+// ── Gin routes M2M ────────────────────────────────────────────────────────────
+
+func TestGenerateGinRoutes_M2M_Import(t *testing.T) {
+	out := GenerateGinRoutes(m2mTestModels, "routes", "myapp/models")
+	if !strings.Contains(out, `"encoding/json"`) {
+		t.Errorf("expected encoding/json import when model has M2M:\n%s", out)
+	}
+}
+
+func TestGenerateGinRoutes_M2M_Preload_List(t *testing.T) {
+	out := GenerateGinRoutes(m2mTestModels, "routes", "myapp/models")
+	if !strings.Contains(out, `.Preload("Courses")`) {
+		t.Errorf("expected Preload(\"Courses\") in list handler:\n%s", out)
+	}
+}
+
+func TestGenerateGinRoutes_M2M_Preload_Get(t *testing.T) {
+	out := GenerateGinRoutes(m2mTestModels, "routes", "myapp/models")
+	if !strings.Contains(out, `.Preload("Courses").First`) {
+		t.Errorf("expected Preload in get handler:\n%s", out)
+	}
+}
+
+func TestGenerateGinRoutes_M2M_AssocReplace(t *testing.T) {
+	out := GenerateGinRoutes(m2mTestModels, "routes", "myapp/models")
+	if !strings.Contains(out, `Association("Courses").Replace`) {
+		t.Errorf("expected Association Replace in create/update handler:\n%s", out)
+	}
+}
+
+func TestGenerateGinRoutes_M2M_IDsField(t *testing.T) {
+	out := GenerateGinRoutes(m2mTestModels, "routes", "myapp/models")
+	if !strings.Contains(out, `json:"course_ids"`) {
+		t.Errorf("expected course_ids JSON field in M2M handler:\n%s", out)
+	}
+}
+
+func TestGenerateGinRoutes_NoM2M_NoJSON(t *testing.T) {
+	// Models without M2M should not import encoding/json.
+	models := []Model{
+		{Name: "items", Fields: []Field{{Name: "name", Type: "text"}}},
+	}
+	out := GenerateGinRoutes(models, "routes", "myapp/models")
+	if strings.Contains(out, `"encoding/json"`) {
+		t.Errorf("should not import encoding/json when no M2M:\n%s", out)
+	}
+}
+
+// ── React types M2M ───────────────────────────────────────────────────────────
+
+func TestGenerateReactTypes_M2M_Interface(t *testing.T) {
+	out := GenerateReactTypes(m2mTestModels[0], m2mTestModels)
+	if !strings.Contains(out, "courses?: Course[]") {
+		t.Errorf("expected 'courses?: Course[]' in Student interface:\n%s", out)
+	}
+}
+
+func TestGenerateReactTypes_M2M_InputType(t *testing.T) {
+	out := GenerateReactTypes(m2mTestModels[0], m2mTestModels)
+	if !strings.Contains(out, "course_ids: number[]") {
+		t.Errorf("expected 'course_ids: number[]' in CreateStudentInput:\n%s", out)
+	}
+}
+
+func TestGenerateReactTypes_M2M_Import(t *testing.T) {
+	out := GenerateReactTypes(m2mTestModels[0], m2mTestModels)
+	if !strings.Contains(out, "import type { Course }") {
+		t.Errorf("expected import for Course type:\n%s", out)
+	}
+}
+
+// ── React page M2M ────────────────────────────────────────────────────────────
+
+func TestGenerateReactPage_M2M_MultiSelect(t *testing.T) {
+	out := GenerateReactPage(m2mTestModels[0], m2mTestModels)
+	if !strings.Contains(out, "select multiple") {
+		t.Errorf("expected 'select multiple' in form for M2M:\n%s", out)
+	}
+	if !strings.Contains(out, "course_ids") {
+		t.Errorf("expected course_ids in page:\n%s", out)
+	}
+}
+
+func TestGenerateReactPage_M2M_Chips(t *testing.T) {
+	out := GenerateReactPage(m2mTestModels[0], m2mTestModels)
+	if !strings.Contains(out, `className="chip"`) {
+		t.Errorf("expected chip class in table cells for M2M:\n%s", out)
+	}
+}
+
+func TestGenerateReactPage_M2M_OpenEdit(t *testing.T) {
+	out := GenerateReactPage(m2mTestModels[0], m2mTestModels)
+	if !strings.Contains(out, "item.courses") {
+		t.Errorf("expected item.courses reference in openEdit:\n%s", out)
+	}
+}
+
+func TestGenerateReactPage_M2M_LoadRefs(t *testing.T) {
+	out := GenerateReactPage(m2mTestModels[0], m2mTestModels)
+	if !strings.Contains(out, "loadRefs") {
+		t.Errorf("expected loadRefs function for M2M:\n%s", out)
+	}
+	if !strings.Contains(out, "listCourses") {
+		t.Errorf("expected listCourses call in loadRefs:\n%s", out)
+	}
+}
+
+// ── joinTableName helper ──────────────────────────────────────────────────────
+
+func TestJoinTableName_Alphabetical(t *testing.T) {
+	if got := joinTableName("students", "courses"); got != "courses_students" {
+		t.Errorf("expected 'courses_students', got %q", got)
+	}
+	if got := joinTableName("courses", "students"); got != "courses_students" {
+		t.Errorf("expected 'courses_students' (reversed), got %q", got)
 	}
 }

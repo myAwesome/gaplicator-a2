@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"strconv"
 {{if .HasSearch}}	"strings"
+{{end}}{{if .HasAnyM2M}}	"encoding/json"
 {{end}}
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
@@ -39,8 +40,9 @@ func list{{.Singular}}(db *gorm.DB) gin.HandlerFunc {
 		if sortDir != "asc" && sortDir != "desc" {
 			sortDir = "desc"
 		}
-		query := db.Model(&{{.Type}}{})
-{{if .SearchColumns}}		if q := c.Query("q"); q != "" {
+{{if .HasM2M}}		query := db{{range .M2MRelations}}.Preload("{{.AssocField}}"){{end}}.Model(&{{.Type}}{})
+{{else}}		query := db.Model(&{{.Type}}{})
+{{end}}{{if .SearchColumns}}		if q := c.Query("q"); q != "" {
 			like := "%" + strings.ReplaceAll(q, "%", "\\%") + "%"
 			query = query.Where("{{range $i, $col := .SearchColumns}}{{if $i}} OR {{end}}{{$col}} ILIKE ?{{end}}", {{range $i, $col := .SearchColumns}}{{if $i}}, {{end}}like{{end}})
 		}
@@ -75,8 +77,9 @@ func get{{.Singular}}(db *gorm.DB) gin.HandlerFunc {
 			return
 		}
 		var row {{.Type}}
-		if err := db.First(&row, id).Error; err != nil {
-			c.JSON(http.StatusNotFound, gin.H{"error": "not found"})
+{{if .HasM2M}}		if err := db{{range .M2MRelations}}.Preload("{{.AssocField}}"){{end}}.First(&row, id).Error; err != nil {
+{{else}}		if err := db.First(&row, id).Error; err != nil {
+{{end}}			c.JSON(http.StatusNotFound, gin.H{"error": "not found"})
 			return
 		}
 		c.JSON(http.StatusOK, row)
@@ -85,16 +88,36 @@ func get{{.Singular}}(db *gorm.DB) gin.HandlerFunc {
 
 func create{{.Singular}}(db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
+{{if .HasM2M}}		body, err := c.GetRawData()
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
 		var row {{.Type}}
+		if err := json.Unmarshal(body, &row); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+{{else}}		var row {{.Type}}
 		if err := c.ShouldBindJSON(&row); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
-		if err := db.Create(&row).Error; err != nil {
+{{end}}		if err := db.Create(&row).Error; err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
-		c.JSON(http.StatusCreated, row)
+{{if .HasM2M}}{{range .M2MRelations}}		var m2m{{.AssocField}} struct {
+			IDs []uint `json:"{{.IDsField}}"`
+		}
+		json.Unmarshal(body, &m2m{{.AssocField}}) //nolint:errcheck
+		var assoc{{.AssocField}} []{{.AssocType}}
+		if len(m2m{{.AssocField}}.IDs) > 0 {
+			db.Find(&assoc{{.AssocField}}, m2m{{.AssocField}}.IDs)
+		}
+		db.Model(&row).Association("{{.AssocField}}").Replace(assoc{{.AssocField}})
+{{end}}		db{{range .M2MRelations}}.Preload("{{.AssocField}}"){{end}}.First(&row, row.ID) //nolint:errcheck
+{{end}}		c.JSON(http.StatusCreated, row)
 	}
 }
 
@@ -110,15 +133,34 @@ func update{{.Singular}}(db *gorm.DB) gin.HandlerFunc {
 			c.JSON(http.StatusNotFound, gin.H{"error": "not found"})
 			return
 		}
-		if err := c.ShouldBindJSON(&row); err != nil {
+{{if .HasM2M}}		body, err := c.GetRawData()
+		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
-		if err := db.Save(&row).Error; err != nil {
+		if err := json.Unmarshal(body, &row); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+{{else}}		if err := c.ShouldBindJSON(&row); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+{{end}}		if err := db.Save(&row).Error; err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
-		c.JSON(http.StatusOK, row)
+{{if .HasM2M}}{{range .M2MRelations}}		var m2m{{.AssocField}}Up struct {
+			IDs []uint `json:"{{.IDsField}}"`
+		}
+		json.Unmarshal(body, &m2m{{.AssocField}}Up) //nolint:errcheck
+		var assoc{{.AssocField}}Up []{{.AssocType}}
+		if len(m2m{{.AssocField}}Up.IDs) > 0 {
+			db.Find(&assoc{{.AssocField}}Up, m2m{{.AssocField}}Up.IDs)
+		}
+		db.Model(&row).Association("{{.AssocField}}").Replace(assoc{{.AssocField}}Up)
+{{end}}		db{{range .M2MRelations}}.Preload("{{.AssocField}}"){{end}}.First(&row, row.ID) //nolint:errcheck
+{{end}}		c.JSON(http.StatusOK, row)
 	}
 }
 

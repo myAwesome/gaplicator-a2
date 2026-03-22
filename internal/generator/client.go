@@ -197,20 +197,65 @@ func GenerateReactApp(models []Model) string {
 }
 
 // GenerateReactTypes returns src/types/{model}.ts with TypeScript interfaces for a model.
-func GenerateReactTypes(m Model) string {
+func GenerateReactTypes(m Model, allModels []Model) string {
 	type typeField struct {
 		Name     string
 		TSType   string
 		Required bool
 	}
+	type m2mImport struct {
+		RefType    string
+		ImportPath string
+	}
+	type m2mField struct {
+		FieldName string
+		TSType    string
+	}
+	type m2mIDField struct {
+		IDsField string
+	}
+
 	fields := make([]typeField, len(m.Fields))
 	for i, f := range m.Fields {
 		fields[i] = typeField{f.Name, sqlTypeToTS(f.Type), f.Required}
 	}
+
+	_ = allModels // used for future display_field resolution; M2M types inferred from names
+	var m2mImports []m2mImport
+	var m2mFields []m2mField
+	var m2mIDFields []m2mIDField
+	seen := map[string]bool{}
+	for _, otherName := range m.ManyToMany {
+		otherStruct := toPascalCase(toSingular(otherName))
+		if !seen[otherName] {
+			seen[otherName] = true
+			m2mImports = append(m2mImports, m2mImport{
+				RefType:    otherStruct,
+				ImportPath: "./" + toSingular(otherName),
+			})
+		}
+		m2mFields = append(m2mFields, m2mField{
+			FieldName: otherName,
+			TSType:    otherStruct,
+		})
+		m2mIDFields = append(m2mIDFields, m2mIDField{
+			IDsField: toSingular(otherName) + "_ids",
+		})
+	}
+
 	return execTmpl("react_types_ts", reactTypesTmpl, struct {
-		StructName string
-		Fields     []typeField
-	}{toPascalCase(toSingular(m.Name)), fields})
+		StructName  string
+		Fields      []typeField
+		M2MImports  []m2mImport
+		M2MFields   []m2mField
+		M2MIDFields []m2mIDField
+	}{
+		StructName:  toPascalCase(toSingular(m.Name)),
+		Fields:      fields,
+		M2MImports:  m2mImports,
+		M2MFields:   m2mFields,
+		M2MIDFields: m2mIDFields,
+	})
 }
 
 // GenerateReactAPI returns src/api/{model}.ts with fetch wrappers for a model.
@@ -237,6 +282,18 @@ type pageFKImport struct {
 	RefPlural   string
 	OptionsVar  string
 	SetterVar   string
+}
+
+type pageM2MRelation struct {
+	IDsField    string
+	AssocField  string
+	Label       string
+	OptionsVar  string
+	SetterVar   string
+	RefStruct   string
+	RefSingular string
+	RefPlural   string
+	LabelField  string
 }
 
 type pageFormField struct {
@@ -295,6 +352,7 @@ type reactPageData struct {
 	ComponentName  string
 	ModelName      string
 	HasFKs         bool
+	HasRefs        bool
 	FKImports      []pageFKImport
 	FormFields     []pageFormField
 	OpenEditFields []pageOpenEditField
@@ -306,6 +364,8 @@ type reactPageData struct {
 	HasSearch      bool
 	HasFilters     bool
 	FilterFields   []pageFilterField
+	HasM2M         bool
+	M2MRelations   []pageM2MRelation
 }
 
 // GenerateReactPage returns src/pages/{Model}Page.tsx with a CRUD table and form for a model.
@@ -508,6 +568,40 @@ func GenerateReactPage(m Model, allModels []Model) string {
 	}
 	hasFilters := hasSearch || len(filterFields) > 0
 
+	// ── M2M relations ─────────────────────────────────────────────────────
+	var m2mRelations []pageM2MRelation
+	seenM2M := map[string]bool{}
+	for _, otherName := range m.ManyToMany {
+		if seenM2M[otherName] {
+			continue
+		}
+		seenM2M[otherName] = true
+		otherSingular := toSingular(otherName)
+		otherStruct := toPascalCase(otherSingular)
+		ov := strings.ToLower(otherStruct[:1]) + otherStruct[1:] + "Options"
+		sv := "set" + otherStruct + "Options"
+		labelField := "id"
+		for _, rm := range allModels {
+			if rm.Name == otherName {
+				labelField = findLabelField(rm)
+				break
+			}
+		}
+		m2mRelations = append(m2mRelations, pageM2MRelation{
+			IDsField:    otherSingular + "_ids",
+			AssocField:  otherName,
+			Label:       otherName,
+			OptionsVar:  ov,
+			SetterVar:   sv,
+			RefStruct:   otherStruct,
+			RefSingular: otherSingular,
+			RefPlural:   toPascalCase(otherName),
+			LabelField:  labelField,
+		})
+	}
+
+	hasRefs := len(fkFields) > 0 || len(m2mRelations) > 0
+
 	data := reactPageData{
 		StructName:     structName,
 		Singular:       singular,
@@ -515,6 +609,7 @@ func GenerateReactPage(m Model, allModels []Model) string {
 		ComponentName:  structName + "Page",
 		ModelName:      m.Name,
 		HasFKs:         len(fkFields) > 0,
+		HasRefs:        hasRefs,
 		FKImports:      fkImports,
 		FormFields:     formFields,
 		OpenEditFields: openEditFields,
@@ -526,6 +621,8 @@ func GenerateReactPage(m Model, allModels []Model) string {
 		HasSearch:      hasSearch,
 		HasFilters:     hasFilters,
 		FilterFields:   filterFields,
+		HasM2M:         len(m2mRelations) > 0,
+		M2MRelations:   m2mRelations,
 	}
 
 	return execTmpl("react_page_tsx", reactPageTmpl, data)

@@ -132,7 +132,7 @@ var buildCmd = &cobra.Command{
 				for _, m := range cfg.Models {
 					base := generator.ModelFileBasename(m)
 					structName := generator.ModelStructName(m)
-					if err := writeFile(filepath.Join(srcDir, "types", base+".ts"), generator.GenerateReactTypes(m)); err != nil {
+					if err := writeFile(filepath.Join(srcDir, "types", base+".ts"), generator.GenerateReactTypes(m, cfg.Models)); err != nil {
 						return err
 					}
 					if err := writeFile(filepath.Join(srcDir, "api", base+".ts"), generator.GenerateReactAPI(m)); err != nil {
