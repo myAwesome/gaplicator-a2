@@ -11,6 +11,8 @@ database:
 
 models:
   - name: students
+    # many_to_many creates a join table (courses_students) and generates
+    # multi-select UI and relationship endpoints automatically.
     many_to_many: [courses]
     fields:
       - name: first_name
@@ -29,6 +31,9 @@ models:
         type: date
         index: true
         label: "Enrolled At"
+      - name: gpa
+        type: decimal(4,2)
+        label: "GPA"
 
   - name: courses
     fields:
@@ -40,33 +45,54 @@ models:
         type: varchar(20)
         unique: true
         label: "Course Code"
+      - name: status
+        type: enum
+        # values is required for enum fields; generates a CHECK constraint
+        # and dropdown filters in the list UI.
+        values: [active, archived, draft]
+        default: active
+        label: "Status"
 
   - name: subjects
     fields:
       - name: name
         type: varchar(200)
         required: true
-      - name: status
+      - name: difficulty
         type: enum
-        values: [ uno, dos, tres ]
+        values: [beginner, intermediate, advanced]
 
   - name: lessons
     fields:
       - name: date
         type: date
         required: true
+      - name: started_at
+        type: timestamp
+        label: "Started At"
       - name: subject_id
         type: int
         references: subjects.id
+        # display_field controls which field from the referenced model is shown
+        # in form dropdowns and table cells. Defaults to the first name/title field.
+        display_field: name
+        label: "Subject"
 
   - name: attendance
     fields:
       - name: lesson_id
         type: int
         references: lessons.id
+        label: "Lesson"
       - name: student_id
         type: int
         references: students.id
+        display_field: first_name
+        label: "Student"
       - name: present
         type: boolean
         default: false
+        label: "Present"
+      - name: note
+        type: text
+        label: "Note"
