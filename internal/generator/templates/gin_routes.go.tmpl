@@ -17,6 +17,7 @@ func RegisterRoutes(r *gin.Engine, db *gorm.DB) {
 	r.GET({{printf "%q" .BaseID}}, get{{.Singular}}(db))
 	r.POST({{printf "%q" .Base}}, create{{.Singular}}(db))
 	r.PUT({{printf "%q" .BaseID}}, update{{.Singular}}(db))
+	r.DELETE({{printf "%q" .BaseBatch}}, batchDelete{{.Singular}}(db))
 	r.DELETE({{printf "%q" .BaseID}}, delete{{.Singular}}(db))
 {{end}}}
 {{range .Models}}
@@ -172,6 +173,27 @@ func delete{{.Singular}}(db *gorm.DB) gin.HandlerFunc {
 			return
 		}
 		if err := db.Delete(&{{.Type}}{}, id).Error; err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		c.Status(http.StatusNoContent)
+	}
+}
+
+func batchDelete{{.Singular}}(db *gorm.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var body struct {
+			IDs []uint `json:"ids"`
+		}
+		if err := c.ShouldBindJSON(&body); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		if len(body.IDs) == 0 {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "ids required"})
+			return
+		}
+		if err := db.Delete(&{{.Type}}{}, body.IDs).Error; err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}

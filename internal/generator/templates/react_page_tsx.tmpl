@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import type { {{.StructName}}, Create{{.StructName}}Input } from '../types/{{.Singular}}';
-import { list{{.PluralName}}, create{{.StructName}}, update{{.StructName}}, delete{{.StructName}} } from '../api/{{.Singular}}';
+import { list{{.PluralName}}, create{{.StructName}}, update{{.StructName}}, delete{{.StructName}}, batchDelete{{.StructName}} } from '../api/{{.Singular}}';
 {{range .FKImports}}import type { {{.RefStruct}} } from '../types/{{.RefSingular}}';
 import { list{{.RefPlural}} } from '../api/{{.RefSingular}}';
 {{end}}{{range .M2MRelations}}import type { {{.RefStruct}} } from '../types/{{.RefSingular}}';
@@ -21,6 +21,7 @@ export default function {{.ComponentName}}() {
   const limit = 20;
   const [sortBy, setSortBy] = useState('id');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
 {{if .HasFilters}}  const [q, setQ] = useState('');
   const [filters, setFilters] = useState<Record<string, string>>({});
 {{end}}{{range .FKImports}}  const [{{.OptionsVar}}, {{.SetterVar}}] = useState<{{.RefStruct}}[]>([]);
@@ -45,6 +46,7 @@ export default function {{.ComponentName}}() {
 {{end}}      setItems(res.data);
       setTotal(res.total);
       setPage(p);
+      setSelectedIds(new Set());
     } catch (e) { console.error(e); }
   }
 
@@ -101,11 +103,22 @@ export default function {{.ComponentName}}() {
     try { await delete{{.StructName}}(id); load(page); } catch (e) { console.error(e); }
   }
 
+  async function handleBatchDelete() {
+    if (selectedIds.size === 0) return;
+    if (!confirm(`Delete ${selectedIds.size} item(s)?`)) return;
+    try { await batchDelete{{.StructName}}(Array.from(selectedIds)); load(page); } catch (e) { console.error(e); }
+  }
+
   return (
     <div>
       <div className="page-header">
         <h1>{{.ModelName}}</h1>
-        <button className="btn btn-primary" onClick={openCreate}>+ New</button>
+        <div className="header-actions">
+          {selectedIds.size > 0 && (
+            <button className="btn btn-danger" onClick={handleBatchDelete}>Delete {selectedIds.size} selected</button>
+          )}
+          <button className="btn btn-primary" onClick={openCreate}>+ New</button>
+        </div>
       </div>
 {{if .HasFilters}}
       <div className="filter-bar">
@@ -171,6 +184,7 @@ export default function {{.ComponentName}}() {
 
       <table className="data-table">
         <thead><tr>
+          <th><input type="checkbox" checked={items.length > 0 && items.every(i => selectedIds.has(i.id))} onChange={e => { if (e.target.checked) setSelectedIds(new Set(items.map(i => i.id))); else setSelectedIds(new Set()); }} /></th>
           <th className={`sortable${sortBy === 'id' ? ' sorted' : ''}`} onClick={() => handleSort('id')}>id {sortBy === 'id' && (sortDir === 'asc' ? '▲' : '▼')}</th>
           {{range .TableColumns}}<th className={`sortable${sortBy === '{{.Key}}' ? ' sorted' : ''}`} onClick={() => handleSort('{{.Key}}')}>{{.Label}} {sortBy === '{{.Key}}' && (sortDir === 'asc' ? '▲' : '▼')}</th>
           {{end}}{{range .M2MRelations}}<th>{{.Label}}</th>
@@ -179,6 +193,7 @@ export default function {{.ComponentName}}() {
         <tbody>
           {items.map(item => (
             <tr key={item.id}>
+              <td><input type="checkbox" checked={selectedIds.has(item.id)} onChange={e => { const s = new Set(selectedIds); if (e.target.checked) s.add(item.id); else s.delete(item.id); setSelectedIds(s); }} /></td>
               <td>{item.id}</td>
 {{range .TableCells}}              <td>{{.Expr}}</td>
 {{end}}{{range .M2MRelations}}              <td>{(item.{{.AssocField}} ?? []).map((r: {{.RefStruct}}) => <span key={r.id} className="chip">{r.{{.LabelField}}}</span>)}</td>

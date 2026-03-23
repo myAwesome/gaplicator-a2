@@ -702,6 +702,7 @@ type ginModelData struct {
 	Type          string
 	Base          string
 	BaseID        string
+	BaseBatch     string
 	SortColumns   []string
 	SearchColumns []string
 	FilterColumns []ginFilterColumn
@@ -759,6 +760,7 @@ func GenerateGinRoutes(models []Model, pkgName string, modelsImport string) stri
 			Type:          modPkg + "." + s,
 			Base:          "/" + m.Name,
 			BaseID:        "/" + m.Name + "/:id",
+			BaseBatch:     "/" + m.Name + "/batch",
 			SortColumns:   sortCols,
 			SearchColumns: searchCols,
 			FilterColumns: filterCols,
