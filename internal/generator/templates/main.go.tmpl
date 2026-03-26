@@ -20,6 +20,11 @@ func main() {
 		dbHost = {{.DBHost}}
 	}
 
+	dbName := os.Getenv("DB_NAME")
+	if dbName == "" {
+		dbName = {{.DBName}}
+	}
+
 	dbPort := os.Getenv("DB_PORT")
 	if dbPort == "" {
 		dbPort = "5432"
@@ -32,7 +37,7 @@ func main() {
 
 	dsn := fmt.Sprintf(
 		"host=%s user=%s password=%s dbname=%s port=%s sslmode=%s",
-		dbHost, os.Getenv("DB_USER"), os.Getenv("DB_PASSWORD"), {{.DBName}}, dbPort, dbSSLMode,
+		dbHost, os.Getenv("DB_USER"), os.Getenv("DB_PASSWORD"), dbName, dbPort, dbSSLMode,
 	)
 
 	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})

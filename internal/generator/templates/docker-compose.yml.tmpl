@@ -6,6 +6,7 @@ services:
     environment:
       DB_HOST: postgres
       DB_PORT: "5432"
+      DB_NAME: {{.DBName}}
       DB_USER: ${DB_USER:-postgres}
       DB_PASSWORD: ${DB_PASSWORD:-secret}
     depends_on:
