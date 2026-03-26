@@ -199,9 +199,10 @@ func GenerateReactApp(models []Model) string {
 // GenerateReactTypes returns src/types/{model}.ts with TypeScript interfaces for a model.
 func GenerateReactTypes(m Model, allModels []Model) string {
 	type typeField struct {
-		Name     string
-		TSType   string
-		Required bool
+		Name        string
+		TSType      string
+		Required    bool
+		IsOptionalFK bool
 	}
 	type m2mImport struct {
 		RefType    string
@@ -217,7 +218,7 @@ func GenerateReactTypes(m Model, allModels []Model) string {
 
 	fields := make([]typeField, len(m.Fields))
 	for i, f := range m.Fields {
-		fields[i] = typeField{f.Name, sqlTypeToTS(f.Type), f.Required}
+		fields[i] = typeField{f.Name, sqlTypeToTS(f.Type), f.Required, f.References != "" && !f.Required}
 	}
 
 	_ = allModels // used for future display_field resolution; M2M types inferred from names
@@ -446,7 +447,11 @@ func GenerateReactPage(m Model, allModels []Model) string {
 	// ── FormFields (EMPTY_FORM) ────────────────────────────────────────────
 	formFields := make([]pageFormField, len(m.Fields))
 	for i, f := range m.Fields {
-		formFields[i] = pageFormField{f.Name, tsInputDefault(f.Type)}
+		defaultVal := tsInputDefault(f.Type)
+		if f.References != "" && !f.Required {
+			defaultVal = "null"
+		}
+		formFields[i] = pageFormField{f.Name, defaultVal}
 	}
 
 	// ── OpenEditFields ────────────────────────────────────────────────────
@@ -458,6 +463,8 @@ func GenerateReactPage(m Model, allModels []Model) string {
 			expr = fmt.Sprintf("item.%s ? (item.%s as string).slice(0, 10) : ''", f.Name, f.Name)
 		case isDatetimeType(f.Type):
 			expr = fmt.Sprintf("item.%s ? (item.%s as string).slice(0, 16) : ''", f.Name, f.Name)
+		case f.References != "" && !f.Required:
+			expr = fmt.Sprintf("item.%s ?? null", f.Name)
 		case f.Required:
 			expr = "item." + f.Name
 		default:

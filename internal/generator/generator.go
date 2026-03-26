@@ -530,9 +530,13 @@ func GenerateGORMModels(models []Model, pkgName string) string {
 		fields := make([]gormFieldData, 0, len(m.Fields))
 		for _, f := range m.Fields {
 			fieldName := toPascalCase(f.Name)
+			goType := sqlTypeToGo(f.Type)
+			if f.References != "" && !f.Required {
+				goType = "*" + goType
+			}
 			fd := gormFieldData{
 				FieldName: fieldName,
-				GoType:    sqlTypeToGo(f.Type),
+				GoType:    goType,
 				Tags:      buildFieldTags(f),
 			}
 			if f.References != "" {

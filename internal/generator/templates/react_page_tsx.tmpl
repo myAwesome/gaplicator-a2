@@ -143,8 +143,8 @@ export default function {{.ComponentName}}() {
           <form onSubmit={handleSubmit}>
 {{range .FormInputs}}{{if .IsFK}}            <div className="form-group">
               <label className="form-label">{{.Label}}</label>
-              <select className="form-select" value={form.{{.FieldName}} as number} onChange={e => setForm({...form, {{.FieldName}}: Number(e.target.value)})}{{if .Required}} required{{end}}>
-                <option value={0}>-- select --</option>
+              <select className="form-select" value={form.{{.FieldName}} ?? ''} onChange={e => setForm({...form, {{.FieldName}}: e.target.value ? Number(e.target.value) : null})}{{if .Required}} required{{end}}>
+                <option value="">-- select --</option>
                 { {{.OptionsVar}}.map(opt => (<option key={opt.id} value={opt.id}>{opt.{{.LabelField}}}</option>))}
               </select>
             </div>

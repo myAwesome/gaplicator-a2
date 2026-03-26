@@ -1802,6 +1802,87 @@ func TestGenerateReactPage_M2M_LoadRefs(t *testing.T) {
 	}
 }
 
+// ── Optional FK null handling ─────────────────────────────────────────────────
+
+func TestGenerateGORMModels_OptionalFKUsesPointer(t *testing.T) {
+	models := []Model{
+		{Name: "stadiums", Fields: []Field{{Name: "name", Type: "varchar(200)", Required: true}}},
+		{Name: "clubs", Fields: []Field{
+			{Name: "name", Type: "varchar(200)", Required: true},
+			{Name: "stadium_id", Type: "int", References: "stadiums.id"}, // optional
+		}},
+	}
+	out := GenerateGORMModels(models, "models")
+
+	if !strings.Contains(out, "*int") {
+		t.Errorf("expected '*int' for optional FK field, got:\n%s", out)
+	}
+}
+
+func TestGenerateGORMModels_RequiredFKNoPointer(t *testing.T) {
+	models := []Model{
+		{Name: "stadiums", Fields: []Field{{Name: "name", Type: "varchar(200)", Required: true}}},
+		{Name: "clubs", Fields: []Field{
+			{Name: "stadium_id", Type: "int", References: "stadiums.id", Required: true},
+		}},
+	}
+	out := GenerateGORMModels(models, "models")
+
+	if strings.Contains(out, "*int") {
+		t.Errorf("expected non-pointer 'int' for required FK field, got:\n%s", out)
+	}
+	if !strings.Contains(out, "int") {
+		t.Errorf("expected 'int' for required FK field, got:\n%s", out)
+	}
+}
+
+func TestGenerateReactPage_OptionalFKNullDefault(t *testing.T) {
+	allModels := []Model{
+		{Name: "stadiums", Fields: []Field{{Name: "name", Type: "varchar(200)", Required: true}}},
+		{Name: "clubs", Fields: []Field{
+			{Name: "name", Type: "varchar(200)", Required: true},
+			{Name: "stadium_id", Type: "int", References: "stadiums.id"}, // optional
+		}},
+	}
+	out := GenerateReactPage(allModels[1], allModels)
+
+	if !strings.Contains(out, "stadium_id: null") {
+		t.Errorf("expected 'stadium_id: null' in EMPTY_FORM for optional FK, got:\n%s", out)
+	}
+}
+
+func TestGenerateReactPage_OptionalFKSelectHandlesNull(t *testing.T) {
+	allModels := []Model{
+		{Name: "stadiums", Fields: []Field{{Name: "name", Type: "varchar(200)", Required: true}}},
+		{Name: "clubs", Fields: []Field{
+			{Name: "stadium_id", Type: "int", References: "stadiums.id"}, // optional
+		}},
+	}
+	out := GenerateReactPage(allModels[1], allModels)
+
+	if !strings.Contains(out, "e.target.value ? Number(e.target.value) : null") {
+		t.Errorf("expected null-handling onChange for optional FK select, got:\n%s", out)
+	}
+	if !strings.Contains(out, `<option value="">-- select --</option>`) {
+		t.Errorf("expected empty string value for '-- select --' option, got:\n%s", out)
+	}
+}
+
+func TestGenerateReactTypes_OptionalFKNullableInputType(t *testing.T) {
+	models := []Model{
+		{Name: "stadiums", Fields: []Field{{Name: "name", Type: "varchar(200)", Required: true}}},
+		{Name: "clubs", Fields: []Field{
+			{Name: "name", Type: "varchar(200)", Required: true},
+			{Name: "stadium_id", Type: "int", References: "stadiums.id"}, // optional
+		}},
+	}
+	out := GenerateReactTypes(models[1], models)
+
+	if !strings.Contains(out, "stadium_id: number | null") {
+		t.Errorf("expected 'stadium_id: number | null' in CreateClubInput, got:\n%s", out)
+	}
+}
+
 // ── joinTableName helper ──────────────────────────────────────────────────────
 
 func TestJoinTableName_Alphabetical(t *testing.T) {

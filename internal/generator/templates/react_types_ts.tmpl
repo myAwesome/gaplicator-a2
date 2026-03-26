@@ -9,6 +9,6 @@
 }
 
 export type Create{{.StructName}}Input = {
-{{range .Fields}}  {{.Name}}: {{.TSType}};
+{{range .Fields}}  {{.Name}}: {{if .IsOptionalFK}}{{.TSType}} | null{{else}}{{.TSType}}{{end}};
 {{end}}{{range .M2MIDFields}}  {{.IDsField}}: number[];
 {{end}}};
