@@ -514,6 +514,7 @@ type gormM2MField struct {
 
 type gormModelData struct {
 	StructName string
+	TableName  string
 	Fields     []gormFieldData
 	M2MFields  []gormM2MField
 }
@@ -572,7 +573,7 @@ func GenerateGORMModels(models []Model, pkgName string) string {
 				})
 			}
 		}
-		modelData = append(modelData, gormModelData{StructName: structName, Fields: fields, M2MFields: m2mFields})
+		modelData = append(modelData, gormModelData{StructName: structName, TableName: m.Name, Fields: fields, M2MFields: m2mFields})
 	}
 
 	data := struct {

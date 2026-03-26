@@ -75,6 +75,7 @@ models:
       - name: primary_position
         type: enum
         values: [gk, df, mf, fw]
+        required: true
 
   - name: coaches
     many_to_many: [clubs]
@@ -97,13 +98,16 @@ models:
         type: int
         references: clubs.id
         display_field: name
+        required: true
       - name: away_club_id
         type: int
         references: clubs.id
         display_field: name
+        required: true
       - name: stadium_id
         type: int
         references: stadiums.id
+        display_field: name
       - name: match_date
         type: timestamp
       - name: round_number
@@ -122,9 +126,12 @@ models:
       - name: match_id
         type: int
         references: matches.id
+        required: true
       - name: club_id
         type: int
         references: clubs.id
+        display_field: name
+        required: true
       - name: formation
         type: varchar(20)
 
@@ -133,10 +140,12 @@ models:
       - name: lineup_id
         type: int
         references: match_lineups.id
+        required: true
       - name: player_id
         type: int
         references: players.id
         display_field: first_name
+        required: true
       - name: position
         type: varchar(10)
       - name: is_starting
@@ -152,26 +161,36 @@ models:
       - name: match_id
         type: int
         references: matches.id
+        required: true
       - name: club_id
         type: int
         references: clubs.id
+        display_field: name
+        required: true
       - name: player_id
         type: int
         references: players.id
+        display_field: first_name
+        required: true
       - name: minute
         type: int
       - name: event_type
         type: enum
         values: [goal, assist, yellow_card, red_card, substitution]
+        required: true
 
   - name: standings
     fields:
       - name: season_id
         type: int
         references: seasons.id
+        display_field: name
+        required: true
       - name: club_id
         type: int
         references: clubs.id
+        display_field: name
+        required: true
       - name: played
         type: int
       - name: wins
@@ -192,12 +211,16 @@ models:
       - name: player_id
         type: int
         references: players.id
+        display_field: first_name
+        required: true
       - name: from_club_id
         type: int
         references: clubs.id
+        display_field: name
       - name: to_club_id
         type: int
         references: clubs.id
+        display_field: name
       - name: transfer_date
         type: date
       - name: fee
@@ -205,15 +228,20 @@ models:
       - name: season_id
         type: int
         references: seasons.id
+        display_field: name
 
   - name: injuries
     fields:
       - name: player_id
         type: int
         references: players.id
+        display_field: first_name
+        required: true
       - name: club_id
         type: int
         references: clubs.id
+        display_field: name
+        required: true
       - name: injury_type
         type: varchar(200)
       - name: start_date

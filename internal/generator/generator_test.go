@@ -531,6 +531,22 @@ func TestGenerateGORMModels_AssociationJSONTag(t *testing.T) {
 	}
 }
 
+func TestGenerateGORMModels_TableName(t *testing.T) {
+	// GORM pluralises "Stadium" → "stadia" (Latin); TableName() must override to "stadiums"
+	models := []Model{
+		{Name: "stadiums", Fields: []Field{{Name: "name", Type: "varchar(200)", Required: true}}},
+		{Name: "leagues", Fields: []Field{{Name: "name", Type: "varchar(200)", Required: true}}},
+	}
+	out := GenerateGORMModels(models, "models")
+
+	if !strings.Contains(out, `func (Stadium) TableName() string { return "stadiums" }`) {
+		t.Errorf("expected TableName() returning \"stadiums\" for Stadium struct:\n%s", out)
+	}
+	if !strings.Contains(out, `func (League) TableName() string { return "leagues" }`) {
+		t.Errorf("expected TableName() returning \"leagues\" for League struct:\n%s", out)
+	}
+}
+
 func min(a, b int) int {
 	if a < b {
 		return a
