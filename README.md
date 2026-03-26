@@ -41,6 +41,10 @@ models:
         type: varchar(200)
         required: true
         label: "Post Title"    # optional: shown in React form labels and table headers
+      - name: status
+        type: enum
+        values: [draft, published, archived]
+        default: draft
       - name: published
         type: boolean
         default: false
@@ -50,9 +54,18 @@ models:
       - name: author_id
         type: int
         references: users.id   # FK → must reference an existing model and field
+        display_field: name    # optional: field from referenced model shown in UI dropdowns
+
+  - name: tags
+    many_to_many: [posts]      # auto-creates posts_tags join table
+    fields:
+      - name: name
+        type: varchar(100)
+        required: true
+        unique: true
 ```
 
-Supported field types: `int`, `bigint`, `smallint`, `text`, `boolean`, `bool`, `date`, `datetime`, `timestamp`, `uuid`, `float`, `double`, `varchar(N)`, `char(N)`, `decimal(P,S)`
+Supported field types: `int`, `bigint`, `smallint`, `text`, `boolean`, `bool`, `date`, `datetime`, `timestamp`, `uuid`, `float`, `double`, `varchar(N)`, `char(N)`, `decimal(P,S)`, `enum`
 
 Field attributes:
 
@@ -63,7 +76,15 @@ Field attributes:
 | `default` | Column default value |
 | `index` | Creates a non-unique index (`CREATE INDEX`) |
 | `references` | Foreign key in `model.field` format (e.g. `users.id`) |
+| `display_field` | Field from the referenced model used as the display label in UI dropdowns and table cells. Only valid with `references`. |
 | `label` | Human-readable label for React form inputs and table headers |
+| `values` | Allowed values list — required when `type: enum` |
+
+Model attributes:
+
+| Attribute | Description |
+|-----------|-------------|
+| `many_to_many` | List of other model names to relate through an auto-named join table (names sorted alphabetically, e.g. `posts` + `tags` → `posts_tags`) |
 
 All models include auto-managed `id`, `created_at`, `updated_at`, and `deleted_at` (soft delete) fields via GORM.
 
@@ -98,10 +119,40 @@ dist/
         ├── types/
         │   └── {model}.ts        # TypeScript interfaces
         ├── api/
-        │   └── {model}.ts        # fetch wrappers (list/get/create/update/delete)
+        │   └── {model}.ts        # fetch wrappers (list/get/create/update/delete/batch-delete)
         └── pages/
             └── {Model}Page.tsx   # CRUD table + inline form
 ```
+
+## Generated API
+
+Every model gets the following routes:
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/{model}` | List with pagination, filtering, search, and sorting |
+| `GET` | `/{model}/:id` | Get single item |
+| `POST` | `/{model}` | Create item |
+| `PUT` | `/{model}/:id` | Update item |
+| `DELETE` | `/{model}/:id` | Delete single item |
+| `DELETE` | `/{model}/batch` | Batch delete — request body: `{"ids": [1, 2, 3]}` |
+
+### Filtering, search & sorting
+
+Every list endpoint supports filtering, full-text search, sorting, and pagination out of the box.
+
+| Parameter | Description |
+|-----------|-------------|
+| `q` | Full-text search across all text-type fields (case-insensitive) |
+| `<field_name>` | Filter by exact value (numeric, enum, boolean, or foreign key) |
+| `sort_by` | Field to sort by, or `id`, `created_at`, `updated_at`. Default: `id` |
+| `sort_dir` | `asc` or `desc`. Default: `desc` |
+| `page` | Page number (1-based). Default: `1` |
+| `limit` | Results per page. Default: `20`, max: `100` |
+
+**Example:** `GET /posts?q=hello&status=draft&author_id=5&sort_by=created_at&sort_dir=desc&page=2&limit=20`
+
+The React frontend generates corresponding UI controls: a search input, filter dropdowns for enum/boolean/FK fields, sortable column headers, pagination, and checkbox-based batch delete.
 
 ## Getting Started
 
@@ -127,7 +178,7 @@ No local PostgreSQL client required — migrations run inside the container.
 
 ## Config reference
 
-See [`docs/config.md`](docs/config.md) for the full reference, or [`sandbox/example.yaml`](sandbox/example.yaml) for a working example.
+See [`docs/config.md`](docs/config.md) for the full reference, [`docs/example.yaml`](docs/example.yaml) for a multi-model attendance-journal example, or [`docs/examples/beer-tracker.yaml`](docs/examples/beer-tracker.yaml) for a more complex example with enums and many-to-many relationships.
 
 ## License
 
