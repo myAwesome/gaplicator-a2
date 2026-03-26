@@ -617,13 +617,17 @@ func GenerateMain(cfg *Config, appImport string) (string, error) {
 
 func GenerateDockerCompose(cfg *Config) (string, error) {
 	data := struct {
-		Port   int
-		DBPort int
-		DBName string
+		Port       int
+		DBPort     int
+		DBName     string
+		DBUser     string
+		DBPassword string
 	}{
-		Port:   cfg.App.Port,
-		DBPort: cfg.Database.Port,
-		DBName: cfg.Database.Name,
+		Port:       cfg.App.Port,
+		DBPort:     cfg.Database.Port,
+		DBName:     cfg.Database.Name,
+		DBUser:     cfg.Database.User,
+		DBPassword: cfg.Database.Password,
 	}
 	var buf strings.Builder
 	if err := template.Must(template.New("docker-compose").Parse(dockerComposeTmpl)).Execute(&buf, data); err != nil {

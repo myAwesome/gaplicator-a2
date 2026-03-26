@@ -5,29 +5,32 @@ services:
       - "{{.Port}}:{{.Port}}"
     environment:
       DB_HOST: postgres
-      DB_PORT: {{.DBPort}}
+      DB_PORT: 5432
       DB_NAME: {{.DBName}}
-      DB_USER: ${DB_USER:-postgres}
-      DB_PASSWORD: ${DB_PASSWORD:-secret}
+      DB_USER: {{.DBUser}}
+      DB_PASSWORD: {{.DBPassword}}
+      DB_SSLMODE: disable
     depends_on:
       postgres:
         condition: service_healthy
+    restart: unless-stopped
 
   postgres:
     image: postgres:16-alpine
     environment:
-      POSTGRES_USER: ${DB_USER:-postgres}
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-secret}
+      POSTGRES_USER: {{.DBUser}}
+      POSTGRES_PASSWORD: {{.DBPassword}}
       POSTGRES_DB: {{.DBName}}
     ports:
       - "{{.DBPort}}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-postgres} -d {{.DBName}}"]
+      test: ["CMD-SHELL", "pg_isready -U {{.DBUser}} -d {{.DBName}}"]
       interval: 5s
       timeout: 5s
       retries: 5
+    restart: unless-stopped
 
 volumes:
   postgres_data:
