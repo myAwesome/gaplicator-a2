@@ -1,0 +1,142 @@
+app:
+  name: beer-tracker
+  port: 3000
+
+database:
+  host: localhost
+  port: 5432
+  name: beer_tracker_db
+  user: postgres
+  password: secret
+
+models:
+  - name: countries
+    fields:
+      - name: name
+        type: varchar(100)
+        required: true
+        unique: true
+        label: "Country Name"
+      - name: code
+        type: char(2)
+        unique: true
+        label: "ISO Code"
+
+  - name: styles
+    fields:
+      - name: name
+        type: varchar(100)
+        required: true
+        unique: true
+        label: "Style Name"
+      - name: color
+        type: enum
+        values: [pale, amber, dark, white, mixed]
+        label: "Color"
+      - name: description
+        type: text
+        label: "Description"
+
+  - name: breweries
+    fields:
+      - name: name
+        type: varchar(200)
+        required: true
+        label: "Brewery Name"
+      - name: country_id
+        type: int
+        references: countries.id
+        display_field: name
+        label: "Country"
+      - name: city
+        type: varchar(100)
+        label: "City"
+      - name: founded_year
+        type: int
+        label: "Founded Year"
+      - name: website
+        type: varchar(255)
+        label: "Website"
+
+  - name: beers
+    fields:
+      - name: name
+        type: varchar(200)
+        required: true
+        label: "Beer Name"
+      - name: brewery_id
+        type: int
+        references: breweries.id
+        display_field: name
+        label: "Brewery"
+      - name: style_id
+        type: int
+        references: styles.id
+        display_field: name
+        label: "Style"
+      - name: country_id
+        type: int
+        references: countries.id
+        display_field: name
+        label: "Country of Origin"
+      - name: abv
+        type: decimal(4,2)
+        label: "ABV (%)"
+      - name: ibu
+        type: int
+        label: "IBU"
+      - name: status
+        type: enum
+        values: [active, seasonal, discontinued]
+        default: active
+        label: "Status"
+      - name: description
+        type: text
+        label: "Description"
+
+  - name: consumption_logs
+    fields:
+      - name: beer_id
+        type: int
+        references: beers.id
+        display_field: name
+        label: "Beer"
+        required: true
+      - name: consumed_at
+        type: timestamp
+        required: true
+        index: true
+        label: "Consumed At"
+      - name: quantity_ml
+        type: int
+        label: "Quantity (ml)"
+      - name: rating
+        type: smallint
+        label: "Rating (1–5)"
+      - name: note
+        type: text
+        label: "Note"
+
+  - name: inventories
+    fields:
+      - name: beer_id
+        type: int
+        references: beers.id
+        display_field: name
+        label: "Beer"
+        required: true
+      - name: quantity
+        type: int
+        required: true
+        label: "Quantity"
+      - name: unit
+        type: enum
+        values: [bottle, can, keg, glass]
+        default: bottle
+        label: "Unit"
+      - name: price
+        type: decimal(10,2)
+        label: "Price"
+      - name: location
+        type: varchar(200)
+        label: "Location"
