@@ -5,7 +5,7 @@ services:
       - "{{.Port}}:{{.Port}}"
     environment:
       DB_HOST: postgres
-      DB_PORT: "{{.DBPort}}"
+      DB_PORT: {{.DBPort}}
       DB_NAME: {{.DBName}}
       DB_USER: ${DB_USER:-postgres}
       DB_PASSWORD: ${DB_PASSWORD:-secret}
@@ -20,7 +20,7 @@ services:
       POSTGRES_PASSWORD: ${DB_PASSWORD:-secret}
       POSTGRES_DB: {{.DBName}}
     ports:
-      - "{{.DBPort}}:{{.DBPort}}"
+      - "{{.DBPort}}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
