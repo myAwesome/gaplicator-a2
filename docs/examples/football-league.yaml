@@ -1,0 +1,222 @@
+app:
+  name: football-league
+  port: 3433
+
+database:
+  host: localhost
+  port: 5433
+  name: football_db
+  user: postgres
+  password: secret
+
+models:
+
+  - name: leagues
+    fields:
+      - name: name
+        type: varchar(200)
+        required: true
+      - name: country
+        type: varchar(100)
+      - name: level
+        type: int
+
+  - name: seasons
+    fields:
+      - name: name
+        type: varchar(50)
+        required: true
+      - name: start_date
+        type: date
+      - name: end_date
+        type: date
+      - name: league_id
+        type: int
+        references: leagues.id
+        display_field: name
+
+  - name: stadiums
+    fields:
+      - name: name
+        type: varchar(200)
+        required: true
+      - name: city
+        type: varchar(100)
+      - name: capacity
+        type: int
+
+  - name: clubs
+    many_to_many: [seasons]
+    fields:
+      - name: name
+        type: varchar(200)
+        required: true
+      - name: city
+        type: varchar(100)
+      - name: founded_year
+        type: int
+      - name: stadium_id
+        type: int
+        references: stadiums.id
+        display_field: name
+
+  - name: players
+    many_to_many: [clubs]
+    fields:
+      - name: first_name
+        type: varchar(100)
+        required: true
+      - name: last_name
+        type: varchar(100)
+      - name: birth_date
+        type: date
+      - name: nationality
+        type: varchar(100)
+      - name: primary_position
+        type: enum
+        values: [gk, df, mf, fw]
+
+  - name: coaches
+    many_to_many: [clubs]
+    fields:
+      - name: first_name
+        type: varchar(100)
+        required: true
+      - name: last_name
+        type: varchar(100)
+      - name: nationality
+        type: varchar(100)
+
+  - name: matches
+    fields:
+      - name: season_id
+        type: int
+        references: seasons.id
+        display_field: name
+      - name: home_club_id
+        type: int
+        references: clubs.id
+        display_field: name
+      - name: away_club_id
+        type: int
+        references: clubs.id
+        display_field: name
+      - name: stadium_id
+        type: int
+        references: stadiums.id
+      - name: match_date
+        type: timestamp
+      - name: round_number
+        type: int
+      - name: status
+        type: enum
+        values: [scheduled, finished, cancelled]
+        default: scheduled
+      - name: home_score
+        type: int
+      - name: away_score
+        type: int
+
+  - name: match_lineups
+    fields:
+      - name: match_id
+        type: int
+        references: matches.id
+      - name: club_id
+        type: int
+        references: clubs.id
+      - name: formation
+        type: varchar(20)
+
+  - name: lineup_players
+    fields:
+      - name: lineup_id
+        type: int
+        references: match_lineups.id
+      - name: player_id
+        type: int
+        references: players.id
+        display_field: first_name
+      - name: position
+        type: varchar(10)
+      - name: is_starting
+        type: boolean
+        default: true
+      - name: minute_in
+        type: int
+      - name: minute_out
+        type: int
+
+  - name: match_events
+    fields:
+      - name: match_id
+        type: int
+        references: matches.id
+      - name: club_id
+        type: int
+        references: clubs.id
+      - name: player_id
+        type: int
+        references: players.id
+      - name: minute
+        type: int
+      - name: event_type
+        type: enum
+        values: [goal, assist, yellow_card, red_card, substitution]
+
+  - name: standings
+    fields:
+      - name: season_id
+        type: int
+        references: seasons.id
+      - name: club_id
+        type: int
+        references: clubs.id
+      - name: played
+        type: int
+      - name: wins
+        type: int
+      - name: draws
+        type: int
+      - name: losses
+        type: int
+      - name: goals_for
+        type: int
+      - name: goals_against
+        type: int
+      - name: points
+        type: int
+
+  - name: transfers
+    fields:
+      - name: player_id
+        type: int
+        references: players.id
+      - name: from_club_id
+        type: int
+        references: clubs.id
+      - name: to_club_id
+        type: int
+        references: clubs.id
+      - name: transfer_date
+        type: date
+      - name: fee
+        type: decimal(12,2)
+      - name: season_id
+        type: int
+        references: seasons.id
+
+  - name: injuries
+    fields:
+      - name: player_id
+        type: int
+        references: players.id
+      - name: club_id
+        type: int
+        references: clubs.id
+      - name: injury_type
+        type: varchar(200)
+      - name: start_date
+        type: date
+      - name: end_date
+        type: date
