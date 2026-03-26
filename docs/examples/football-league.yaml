@@ -4,7 +4,7 @@ app:
 
 database:
   host: localhost
-  port: 5433
+  port: 5432
   name: football_db
   user: postgres
   password: secret
