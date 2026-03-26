@@ -19,4 +19,6 @@ type {{.StructName}} struct {
 {{if .AssocField}}	{{printf "%-20s %-12s" .AssocField .AssocType}}`{{.AssocTags}}`
 {{end}}{{end}}{{range .M2MFields}}	{{printf "%-20s %-12s" .FieldName .SliceType}}`{{.Tags}}`
 {{end}}}
+
+func ({{.StructName}}) TableName() string { return "{{.TableName}}" }
 {{end}}
