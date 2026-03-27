@@ -1,0 +1,17 @@
+models:
+    student:
+        name:       string
+        city:       enum("Roma","Milan","London")
+        rank:       float
+        dob:        date
+        active:     boolean
+    discipline:
+        name:       string
+    lesson:
+        name:       string
+        date:       date
+        discipline: rel
+m2m:
+    student_has_lessons:
+        student:    rel
+        lesson:     rel
