@@ -6,7 +6,7 @@ Generate a full-stack web application (database + server + client) from a single
 
 | Layer    | Technology        |
 |----------|-------------------|
-| Database | PostgreSQL        |
+| Database | PostgreSQL or MySQL |
 | Server   | Go + Gin + GORM   |
 | Client   | React + TypeScript + Vite |
 
@@ -28,10 +28,11 @@ app:
   port: 8080     # 1–65535
 
 database:
+  driver: postgres # optional: "postgres" (default) or "mysql"
   host: localhost
-  port: 5432       # optional, default: 5432; must be 1–65535
+  port: 5432       # optional, default: 5432 (postgres) or 3306 (mysql); must be 1–65535
   name: my_db
-  user: postgres   # optional, default: postgres
+  user: postgres   # optional, default: postgres (postgres) or root (mysql)
   password: secret # optional, default: secret
 
 auth:                  # optional: enables JWT authentication
@@ -200,13 +201,13 @@ cd dist && ./dev.sh
 ```
 
 `dev.sh` does three things in order:
-1. Starts the PostgreSQL container via `docker compose up -d postgres`
+1. Starts the database container (`postgres` or `mysql` depending on `database.driver`)
 2. Waits for the database to be healthy, then applies `migrations/001_initial.up.sql`
 3. Starts the Go server with `go run .`
 
 To stop: `./shutdown.sh`
 
-No local PostgreSQL client required — migrations run inside the container.
+No local database client required — migrations run inside the container.
 
 ## Config reference
 
