@@ -60,6 +60,7 @@ type DatabaseConfig struct {
 	Name     string `yaml:"name"`
 	User     string `yaml:"user"`
 	Password string `yaml:"password"`
+	Driver   string `yaml:"driver"` // "postgres" (default) or "mysql"
 }
 
 type Model struct {
@@ -101,11 +102,22 @@ func ParseConfig(path string) (*Config, error) {
 		return nil, fmt.Errorf("parse yaml: %w", err)
 	}
 
+	if cfg.Database.Driver == "" {
+		cfg.Database.Driver = "postgres"
+	}
 	if cfg.Database.Port == 0 {
-		cfg.Database.Port = 5432
+		if cfg.Database.Driver == "mysql" {
+			cfg.Database.Port = 3306
+		} else {
+			cfg.Database.Port = 5432
+		}
 	}
 	if cfg.Database.User == "" {
-		cfg.Database.User = "postgres"
+		if cfg.Database.Driver == "mysql" {
+			cfg.Database.User = "root"
+		} else {
+			cfg.Database.User = "postgres"
+		}
 	}
 	if cfg.Database.Password == "" {
 		cfg.Database.Password = "secret"
@@ -165,6 +177,11 @@ func ValidateConfig(cfg *Config) []error {
 	}
 	if cfg.App.Port < 1 || cfg.App.Port > 65535 {
 		errs = append(errs, fmt.Errorf("app.port must be between 1 and 65535"))
+	}
+	if cfg.Database.Driver == "" {
+		cfg.Database.Driver = "postgres"
+	} else if cfg.Database.Driver != "postgres" && cfg.Database.Driver != "mysql" {
+		errs = append(errs, fmt.Errorf("database.driver must be \"postgres\" or \"mysql\""))
 	}
 	if cfg.Database.Host == "" {
 		errs = append(errs, fmt.Errorf("database.host is required"))
@@ -306,19 +323,19 @@ func ValidateConfig(cfg *Config) []error {
 	return errs
 }
 
-func GenerateMigrationUp(models []Model) string {
+func GenerateMigrationUp(models []Model, driver string) string {
 	sorted := topoSort(models)
 	var sb strings.Builder
 	for i, m := range sorted {
 		if i > 0 {
 			sb.WriteString("\n")
 		}
-		sb.WriteString(tableSQL(m))
+		sb.WriteString(tableSQL(m, driver))
 	}
 	joins := collectJoinTables(models)
 	for _, j := range joins {
 		sb.WriteString("\n")
-		sb.WriteString(joinTableSQL(j))
+		sb.WriteString(joinTableSQL(j, driver))
 	}
 	return sb.String()
 }
@@ -337,13 +354,18 @@ func GenerateMigrationDown(models []Model) string {
 	return sb.String()
 }
 
-func tableSQL(m Model) string {
+func tableSQL(m Model, driver string) string {
+	isMySQL := driver == "mysql"
 	var sb strings.Builder
 	fmt.Fprintf(&sb, "CREATE TABLE IF NOT EXISTS %s (\n", m.Name)
-	sb.WriteString("    id SERIAL PRIMARY KEY")
+	if isMySQL {
+		sb.WriteString("    id INT AUTO_INCREMENT PRIMARY KEY")
+	} else {
+		sb.WriteString("    id SERIAL PRIMARY KEY")
+	}
 	for _, f := range m.Fields {
 		sb.WriteString(",\n")
-		fmt.Fprintf(&sb, "    %s %s", f.Name, fieldSQLType(f))
+		fmt.Fprintf(&sb, "    %s %s", f.Name, fieldSQLType(f, driver))
 		if f.Required {
 			sb.WriteString(" NOT NULL")
 		}
@@ -367,13 +389,20 @@ func tableSQL(m Model) string {
 	return sb.String()
 }
 
-func fieldSQLType(f Field) string {
-	if strings.ToLower(f.Type) == "enum" {
+func fieldSQLType(f Field, driver string) string {
+	lower := strings.ToLower(f.Type)
+	if lower == "enum" {
 		quotedValues := make([]string, len(f.Values))
 		for i, v := range f.Values {
 			quotedValues[i] = "'" + strings.ReplaceAll(v, "'", "''") + "'"
 		}
+		if driver == "mysql" {
+			return fmt.Sprintf("ENUM(%s)", strings.Join(quotedValues, ", "))
+		}
 		return fmt.Sprintf("TEXT CHECK (%s IN (%s))", f.Name, strings.Join(quotedValues, ", "))
+	}
+	if driver == "mysql" && lower == "uuid" {
+		return "VARCHAR(36)"
 	}
 	return strings.ToUpper(f.Type)
 }
@@ -471,7 +500,18 @@ func collectJoinTables(models []Model) []joinTableDef {
 	return result
 }
 
-func joinTableSQL(j joinTableDef) string {
+func joinTableSQL(j joinTableDef, driver string) string {
+	if driver == "mysql" {
+		return fmt.Sprintf(
+			"CREATE TABLE IF NOT EXISTS %s (\n    %s INT NOT NULL,\n    %s INT NOT NULL,\n    PRIMARY KEY (%s, %s),\n    FOREIGN KEY (%s) REFERENCES %s(id) ON DELETE CASCADE,\n    FOREIGN KEY (%s) REFERENCES %s(id) ON DELETE CASCADE\n);\n",
+			j.Table,
+			j.ACol,
+			j.BCol,
+			j.ACol, j.BCol,
+			j.ACol, j.AName,
+			j.BCol, j.BName,
+		)
+	}
 	return fmt.Sprintf(
 		"CREATE TABLE IF NOT EXISTS %s (\n    %s INT NOT NULL REFERENCES %s(id) ON DELETE CASCADE,\n    %s INT NOT NULL REFERENCES %s(id) ON DELETE CASCADE,\n    PRIMARY KEY (%s, %s)\n);\n",
 		j.Table,
@@ -675,17 +715,21 @@ func GenerateMain(cfg *Config, appImport string) (string, error) {
 		RoutesImport string
 		DBHost       string
 		DBName       string
+		DBPort       int
 		Port         int
 		Models       []string
 		HasAuth      bool
+		IsMySQL      bool
 	}{
 		ModelsImport: fmt.Sprintf("%q", appImport+"/models"),
 		RoutesImport: fmt.Sprintf("%q", appImport+"/routes"),
 		DBHost:       fmt.Sprintf("%q", cfg.Database.Host),
 		DBName:       fmt.Sprintf("%q", cfg.Database.Name),
+		DBPort:       cfg.Database.Port,
 		Port:         cfg.App.Port,
 		Models:       models,
 		HasAuth:      cfg.Auth != nil,
+		IsMySQL:      cfg.Database.Driver == "mysql",
 	}
 
 	var buf strings.Builder
@@ -702,12 +746,14 @@ func GenerateDockerCompose(cfg *Config) (string, error) {
 		DBName     string
 		DBUser     string
 		DBPassword string
+		IsMySQL    bool
 	}{
 		Port:       cfg.App.Port,
 		DBPort:     cfg.Database.Port,
 		DBName:     cfg.Database.Name,
 		DBUser:     cfg.Database.User,
 		DBPassword: cfg.Database.Password,
+		IsMySQL:    cfg.Database.Driver == "mysql",
 	}
 	var buf strings.Builder
 	if err := template.Must(template.New("docker-compose").Parse(dockerComposeTmpl)).Execute(&buf, data); err != nil {
@@ -720,7 +766,8 @@ func GenerateGoMod(cfg *Config) (string, error) {
 	data := struct {
 		ModuleName string
 		HasAuth    bool
-	}{ModuleName: cfg.App.Name, HasAuth: cfg.Auth != nil}
+		IsMySQL    bool
+	}{ModuleName: cfg.App.Name, HasAuth: cfg.Auth != nil, IsMySQL: cfg.Database.Driver == "mysql"}
 	var buf strings.Builder
 	if err := template.Must(template.New("go.mod").Parse(goModTmpl)).Execute(&buf, data); err != nil {
 		return "", fmt.Errorf("execute go.mod template: %w", err)
@@ -736,6 +783,7 @@ func GenerateEnv(cfg *Config) (string, error) {
 		DBPassword string
 		DBName     string
 		HasAuth    bool
+		IsMySQL    bool
 	}{
 		DBHost:     cfg.Database.Host,
 		DBPort:     cfg.Database.Port,
@@ -743,6 +791,7 @@ func GenerateEnv(cfg *Config) (string, error) {
 		DBPassword: cfg.Database.Password,
 		DBName:     cfg.Database.Name,
 		HasAuth:    cfg.Auth != nil,
+		IsMySQL:    cfg.Database.Driver == "mysql",
 	}
 	var buf strings.Builder
 	if err := template.Must(template.New(".env").Parse(envTmpl)).Execute(&buf, data); err != nil {
@@ -758,12 +807,14 @@ func GenerateDevScript(cfg *Config) (string, error) {
 		DBName     string
 		DBPort     int
 		Port       int
+		IsMySQL    bool
 	}{
 		DBUser:     cfg.Database.User,
 		DBPassword: cfg.Database.Password,
 		DBName:     cfg.Database.Name,
 		DBPort:     cfg.Database.Port,
 		Port:       cfg.App.Port,
+		IsMySQL:    cfg.Database.Driver == "mysql",
 	}
 	var buf strings.Builder
 	if err := template.Must(template.New("dev.sh").Parse(devShTmpl)).Execute(&buf, data); err != nil {
@@ -807,7 +858,7 @@ type ginModelData struct {
 	HasM2M        bool
 }
 
-func GenerateGinRoutes(models []Model, pkgName string, modelsImport string) string {
+func GenerateGinRoutes(models []Model, pkgName string, modelsImport string, isMySQL bool) string {
 	modPkg := modelsImport
 	if idx := strings.LastIndex(modelsImport, "/"); idx >= 0 {
 		modPkg = modelsImport[idx+1:]
@@ -866,13 +917,19 @@ func GenerateGinRoutes(models []Model, pkgName string, modelsImport string) stri
 		})
 	}
 
+	likeOp := "ILIKE"
+	if isMySQL {
+		likeOp = "LIKE"
+	}
+
 	data := struct {
 		PkgName      string
 		ModelsImport string
 		HasSearch    bool
 		HasAnyM2M    bool
 		Models       []ginModelData
-	}{PkgName: pkgName, ModelsImport: modelsImport, HasSearch: hasAnySearch, HasAnyM2M: hasAnyM2M, Models: ginModels}
+		LikeOp       string
+	}{PkgName: pkgName, ModelsImport: modelsImport, HasSearch: hasAnySearch, HasAnyM2M: hasAnyM2M, Models: ginModels, LikeOp: likeOp}
 
 	var buf strings.Builder
 	template.Must(template.New("gin_routes").Parse(ginRoutesTmpl)).Execute(&buf, data) //nolint:errcheck

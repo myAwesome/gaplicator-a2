@@ -9,11 +9,25 @@ if [ -f .env ]; then
 fi
 
 DB_USER="${DB_USER:-{{.DBUser}}}"
+DB_PASSWORD="${DB_PASSWORD:-{{.DBPassword}}}"
 DB_NAME="${DB_NAME:-{{.DBName}}}"
 
 # ── 1. Database ────────────────────────────────────────────────────────────────
 echo "▸ Starting database..."
-docker compose up -d postgres
+{{if .IsMySQL}}docker compose up -d mysql
+
+echo -n "▸ Waiting for database to be ready..."
+until docker compose exec -T mysql mysqladmin ping -h localhost -u "$DB_USER" --password="$DB_PASSWORD" >/dev/null 2>&1; do
+  printf "."
+  sleep 1
+done
+echo " ready"
+
+# ── 2. Migrations ──────────────────────────────────────────────────────────────
+echo "▸ Applying migrations..."
+docker compose exec -T mysql mysql -u "$DB_USER" --password="$DB_PASSWORD" "$DB_NAME" < migrations/001_initial.up.sql
+echo "  migrations applied"
+{{else}}docker compose up -d postgres
 
 echo -n "▸ Waiting for database to be ready..."
 until docker compose exec -T postgres pg_isready -U "$DB_USER" -d "$DB_NAME" >/dev/null 2>&1; do
@@ -26,7 +40,7 @@ echo " ready"
 echo "▸ Applying migrations..."
 docker compose exec -T postgres psql -U "$DB_USER" -d "$DB_NAME" < migrations/001_initial.up.sql
 echo "  migrations applied"
-
+{{end}}
 # ── 3. Server ──────────────────────────────────────────────────────────────────
 echo "▸ Downloading dependencies..."
 GOTOOLCHAIN=local go get ./...

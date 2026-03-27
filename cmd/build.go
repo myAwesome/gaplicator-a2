@@ -42,7 +42,7 @@ var buildCmd = &cobra.Command{
 				if err := os.MkdirAll(dir, 0755); err != nil {
 					return err
 				}
-				if err := writeFile(filepath.Join(dir, "001_initial.up.sql"), generator.GenerateMigrationUp(cfg.Models)); err != nil {
+				if err := writeFile(filepath.Join(dir, "001_initial.up.sql"), generator.GenerateMigrationUp(cfg.Models, cfg.Database.Driver)); err != nil {
 					return err
 				}
 				return writeFile(filepath.Join(dir, "001_initial.down.sql"), generator.GenerateMigrationDown(cfg.Models))
@@ -59,7 +59,7 @@ var buildCmd = &cobra.Command{
 				if err := os.MkdirAll(dir, 0755); err != nil {
 					return err
 				}
-				return writeFile(filepath.Join(dir, "routes.go"), generator.GenerateGinRoutes(cfg.Models, "routes", cfg.App.Name+"/models"))
+				return writeFile(filepath.Join(dir, "routes.go"), generator.GenerateGinRoutes(cfg.Models, "routes", cfg.App.Name+"/models", cfg.Database.Driver == "mysql"))
 			}},
 			{"Generating main.go", func() error {
 				content, err := generator.GenerateMain(cfg, cfg.App.Name)
