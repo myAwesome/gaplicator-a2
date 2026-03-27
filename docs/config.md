@@ -8,6 +8,7 @@ app:
   port: 8080
 
 database:
+  driver: postgres  # optional: "postgres" (default) or "mysql"
   host: localhost
   name: my_db
 
@@ -37,11 +38,22 @@ models:
 
 | Key | Type | Required | Default | Description |
 |-----|------|----------|---------|-------------|
-| `host` | string | yes | — | PostgreSQL hostname. |
+| `driver` | string | no | `postgres` | Database driver. Accepted values: `postgres`, `mysql`. |
+| `host` | string | yes | — | Database hostname. |
 | `name` | string | yes | — | Database name. |
-| `port` | int | no | `5432` | PostgreSQL port. Must be between 1 and 65535. |
-| `user` | string | no | `postgres` | Database user. |
+| `port` | int | no | `5432` / `3306` | Port — defaults to `5432` for PostgreSQL and `3306` for MySQL. Must be between 1 and 65535. |
+| `user` | string | no | `postgres` / `root` | Database user — defaults to `postgres` for PostgreSQL and `root` for MySQL. |
 | `password` | string | no | `secret` | Database password. |
+
+### Driver differences
+
+| Feature | PostgreSQL | MySQL |
+|---------|-----------|-------|
+| Primary key | `SERIAL PRIMARY KEY` | `INT AUTO_INCREMENT PRIMARY KEY` |
+| Enum type | `TEXT CHECK (col IN (...))` | Native `ENUM(...)` |
+| UUID type | `UUID` | `VARCHAR(36)` |
+| Text search | `ILIKE` (case-insensitive) | `LIKE` (case-insensitive with utf8mb4) |
+| Docker image | `postgres:16-alpine` | `mysql:8` |
 
 ---
 
@@ -144,7 +156,7 @@ All models automatically include `id`, `created_at`, `updated_at`, and `deleted_
 | `date` | |
 | `datetime` / `timestamp` | |
 | `uuid` | |
-| `enum` | Requires `values` list. Generates a `TEXT CHECK (... IN (...))` column and dropdown filters in the UI. |
+| `enum` | Requires `values` list. Generates a `TEXT CHECK (... IN (...))` column (PostgreSQL) or native `ENUM(...)` (MySQL), and dropdown filters in the UI. |
 
 ---
 
@@ -154,7 +166,7 @@ Every generated list endpoint supports filtering, full-text search, sorting, and
 
 | Field type | Generated filter |
 |------------|-----------------|
-| `text`, `varchar(N)`, `char(N)`, `uuid` | Included in full-text search via `q` parameter (case-insensitive `ILIKE`) |
+| `text`, `varchar(N)`, `char(N)`, `uuid` | Included in full-text search via `q` parameter (case-insensitive: `ILIKE` for PostgreSQL, `LIKE` for MySQL) |
 | `int`, `bigint`, `smallint`, `float`, `double`, `decimal` | Exact-match filter via `?field_name=value` |
 | `references` (foreign key) | Exact-match filter via `?field_name=value`, with a dropdown in the UI |
 | `enum` | Exact-match filter via `?field_name=value`, with a dropdown showing `values` |

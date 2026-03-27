@@ -73,14 +73,14 @@ var ginTestModels = []Model{
 }
 
 func TestGenerateGinRoutes_PackageDeclaration(t *testing.T) {
-	out := GenerateGinRoutes(ginTestModels, "routes", "myapp/models")
+	out := GenerateGinRoutes(ginTestModels, "routes", "myapp/models", false)
 	if !strings.HasPrefix(out, "package routes\n") {
 		t.Errorf("expected 'package routes' header, got start: %q", out[:min(40, len(out))])
 	}
 }
 
 func TestGenerateGinRoutes_Imports(t *testing.T) {
-	out := GenerateGinRoutes(ginTestModels, "routes", "myapp/models")
+	out := GenerateGinRoutes(ginTestModels, "routes", "myapp/models", false)
 	for _, want := range []string{
 		`"net/http"`,
 		`"strconv"`,
@@ -95,7 +95,7 @@ func TestGenerateGinRoutes_Imports(t *testing.T) {
 }
 
 func TestGenerateGinRoutes_RegisterRoutes(t *testing.T) {
-	out := GenerateGinRoutes(ginTestModels, "routes", "myapp/models")
+	out := GenerateGinRoutes(ginTestModels, "routes", "myapp/models", false)
 
 	wants := []string{
 		`r.GET("/students", listStudent(db))`,
@@ -124,7 +124,7 @@ func TestGenerateGinRoutes_RegisterRoutes(t *testing.T) {
 func TestGenerateGinRoutes_HandlerSignatures(t *testing.T) {
 	out := GenerateGinRoutes([]Model{
 		{Name: "students", Fields: []Field{{Name: "name", Type: "text"}}},
-	}, "routes", "myapp/models")
+	}, "routes", "myapp/models", false)
 
 	for _, want := range []string{
 		"func listStudent(db *gorm.DB) gin.HandlerFunc",
@@ -142,7 +142,7 @@ func TestGenerateGinRoutes_HandlerSignatures(t *testing.T) {
 func TestGenerateGinRoutes_ModelTypeReference(t *testing.T) {
 	out := GenerateGinRoutes([]Model{
 		{Name: "students", Fields: []Field{{Name: "name", Type: "text"}}},
-	}, "routes", "myapp/models")
+	}, "routes", "myapp/models", false)
 
 	if !strings.Contains(out, "models.Student") {
 		t.Error("expected 'models.Student' type reference in output")
@@ -152,7 +152,7 @@ func TestGenerateGinRoutes_ModelTypeReference(t *testing.T) {
 func TestGenerateGinRoutes_ModelsImportBasename(t *testing.T) {
 	out := GenerateGinRoutes([]Model{
 		{Name: "products", Fields: []Field{{Name: "price", Type: "float"}}},
-	}, "routes", "github.com/acme/shop/models")
+	}, "routes", "github.com/acme/shop/models", false)
 
 	if !strings.Contains(out, `"github.com/acme/shop/models"`) {
 		t.Error("expected full import path in output")
@@ -165,7 +165,7 @@ func TestGenerateGinRoutes_ModelsImportBasename(t *testing.T) {
 func TestGenerateGinRoutes_AllHTTPVerbs(t *testing.T) {
 	out := GenerateGinRoutes([]Model{
 		{Name: "items", Fields: []Field{{Name: "title", Type: "text"}}},
-	}, "routes", "app/models")
+	}, "routes", "app/models", false)
 
 	for _, want := range []string{
 		"http.StatusOK",
@@ -185,7 +185,7 @@ func TestGenerateGinRoutes_SingularRouteNames(t *testing.T) {
 	// Handler function names should use singular struct names, not plural table names.
 	out := GenerateGinRoutes([]Model{
 		{Name: "categories", Fields: []Field{{Name: "name", Type: "text"}}},
-	}, "routes", "app/models")
+	}, "routes", "app/models", false)
 
 	// "categories" → singular "category" → PascalCase "Category"
 	if !strings.Contains(out, "listCategory") {
@@ -916,7 +916,7 @@ func TestGenerateDevScript_BackgroundProcesses(t *testing.T) {
 func TestGenerateGinRoutes_Pagination(t *testing.T) {
 	out := GenerateGinRoutes([]Model{
 		{Name: "items", Fields: []Field{{Name: "title", Type: "text"}}},
-	}, "routes", "app/models")
+	}, "routes", "app/models", false)
 
 	for _, want := range []string{
 		`c.DefaultQuery("page", "1")`,
@@ -1242,7 +1242,7 @@ func TestGenerateMigrationUp_EnumCheckConstraint(t *testing.T) {
 			{Name: "status", Type: "enum", Values: []string{"draft", "published", "archived"}, Required: true},
 		}},
 	}
-	out := GenerateMigrationUp(models)
+	out := GenerateMigrationUp(models, "postgres")
 
 	if !strings.Contains(out, "status TEXT CHECK (status IN ('draft', 'published', 'archived'))") {
 		t.Errorf("expected CHECK constraint for enum field, got:\n%s", out)
@@ -1336,7 +1336,7 @@ func TestGenerateReactTypes_EnumFieldIsString(t *testing.T) {
 func TestGenerateGinRoutes_Search_VarcharField(t *testing.T) {
 	out := GenerateGinRoutes([]Model{
 		{Name: "posts", Fields: []Field{{Name: "title", Type: "varchar(200)", Required: true}}},
-	}, "routes", "app/models")
+	}, "routes", "app/models", false)
 
 	for _, want := range []string{
 		`"strings"`,
@@ -1356,7 +1356,7 @@ func TestGenerateGinRoutes_Search_MultipleTextFields(t *testing.T) {
 			{Name: "title", Type: "varchar(200)", Required: true},
 			{Name: "body", Type: "text"},
 		}},
-	}, "routes", "app/models")
+	}, "routes", "app/models", false)
 
 	if !strings.Contains(out, "title ILIKE ? OR body ILIKE ?") {
 		t.Error("expected OR-joined ILIKE for multiple text fields")
@@ -1369,7 +1369,7 @@ func TestGenerateGinRoutes_NoSearch_NoStringsImport(t *testing.T) {
 			{Name: "value", Type: "int", Required: true},
 			{Name: "passed", Type: "boolean"},
 		}},
-	}, "routes", "app/models")
+	}, "routes", "app/models", false)
 
 	if strings.Contains(out, `"strings"`) {
 		t.Error("should not import 'strings' when no searchable fields exist")
@@ -1384,7 +1384,7 @@ func TestGenerateGinRoutes_Filter_StringField(t *testing.T) {
 		{Name: "posts", Fields: []Field{
 			{Name: "status", Type: "enum", Values: []string{"draft", "published"}},
 		}},
-	}, "routes", "app/models")
+	}, "routes", "app/models", false)
 
 	for _, want := range []string{
 		`c.Query("status")`,
@@ -1402,7 +1402,7 @@ func TestGenerateGinRoutes_Filter_NumericField(t *testing.T) {
 			{Name: "author_id", Type: "int", References: "users.id"},
 		}},
 		{Name: "users", Fields: []Field{{Name: "name", Type: "text"}}},
-	}, "routes", "app/models")
+	}, "routes", "app/models", false)
 
 	for _, want := range []string{
 		`c.Query("author_id")`,
@@ -1420,7 +1420,7 @@ func TestGenerateGinRoutes_Filter_BoolField(t *testing.T) {
 		{Name: "items", Fields: []Field{
 			{Name: "active", Type: "boolean"},
 		}},
-	}, "routes", "app/models")
+	}, "routes", "app/models", false)
 
 	for _, want := range []string{
 		`c.Query("active")`,
@@ -1635,7 +1635,7 @@ func TestValidateConfig_M2M_SelfReference(t *testing.T) {
 // ── Migration M2M ─────────────────────────────────────────────────────────────
 
 func TestGenerateMigrationUp_JoinTable(t *testing.T) {
-	out := GenerateMigrationUp(m2mTestModels)
+	out := GenerateMigrationUp(m2mTestModels, "postgres")
 	if !strings.Contains(out, "CREATE TABLE IF NOT EXISTS courses_students") {
 		t.Errorf("expected join table 'courses_students' in migration up:\n%s", out)
 	}
@@ -1660,8 +1660,8 @@ func TestGenerateMigrationUp_JoinTable_AlphaOrder(t *testing.T) {
 		{Name: "courses", ManyToMany: []string{"students"}, Fields: []Field{{Name: "n", Type: "text"}}},
 		{Name: "students", Fields: []Field{{Name: "n", Type: "text"}}},
 	}
-	out1 := GenerateMigrationUp(models1)
-	out2 := GenerateMigrationUp(models2)
+	out1 := GenerateMigrationUp(models1, "postgres")
+	out2 := GenerateMigrationUp(models2, "postgres")
 	for _, out := range []string{out1, out2} {
 		if !strings.Contains(out, "courses_students") {
 			t.Errorf("expected join table name 'courses_students':\n%s", out)
@@ -1675,7 +1675,7 @@ func TestGenerateMigrationUp_JoinTable_Deduplicated(t *testing.T) {
 		{Name: "students", ManyToMany: []string{"courses"}, Fields: []Field{{Name: "n", Type: "text"}}},
 		{Name: "courses", ManyToMany: []string{"students"}, Fields: []Field{{Name: "n", Type: "text"}}},
 	}
-	out := GenerateMigrationUp(models)
+	out := GenerateMigrationUp(models, "postgres")
 	count := strings.Count(out, "CREATE TABLE IF NOT EXISTS courses_students")
 	if count != 1 {
 		t.Errorf("expected join table to appear exactly once, got %d:\n%s", count, out)
@@ -1715,35 +1715,35 @@ func TestGenerateGORMModels_M2M_Field(t *testing.T) {
 // ── Gin routes M2M ────────────────────────────────────────────────────────────
 
 func TestGenerateGinRoutes_M2M_Import(t *testing.T) {
-	out := GenerateGinRoutes(m2mTestModels, "routes", "myapp/models")
+	out := GenerateGinRoutes(m2mTestModels, "routes", "myapp/models", false)
 	if !strings.Contains(out, `"encoding/json"`) {
 		t.Errorf("expected encoding/json import when model has M2M:\n%s", out)
 	}
 }
 
 func TestGenerateGinRoutes_M2M_Preload_List(t *testing.T) {
-	out := GenerateGinRoutes(m2mTestModels, "routes", "myapp/models")
+	out := GenerateGinRoutes(m2mTestModels, "routes", "myapp/models", false)
 	if !strings.Contains(out, `.Preload("Courses")`) {
 		t.Errorf("expected Preload(\"Courses\") in list handler:\n%s", out)
 	}
 }
 
 func TestGenerateGinRoutes_M2M_Preload_Get(t *testing.T) {
-	out := GenerateGinRoutes(m2mTestModels, "routes", "myapp/models")
+	out := GenerateGinRoutes(m2mTestModels, "routes", "myapp/models", false)
 	if !strings.Contains(out, `.Preload("Courses").First`) {
 		t.Errorf("expected Preload in get handler:\n%s", out)
 	}
 }
 
 func TestGenerateGinRoutes_M2M_AssocReplace(t *testing.T) {
-	out := GenerateGinRoutes(m2mTestModels, "routes", "myapp/models")
+	out := GenerateGinRoutes(m2mTestModels, "routes", "myapp/models", false)
 	if !strings.Contains(out, `Association("Courses").Replace`) {
 		t.Errorf("expected Association Replace in create/update handler:\n%s", out)
 	}
 }
 
 func TestGenerateGinRoutes_M2M_IDsField(t *testing.T) {
-	out := GenerateGinRoutes(m2mTestModels, "routes", "myapp/models")
+	out := GenerateGinRoutes(m2mTestModels, "routes", "myapp/models", false)
 	if !strings.Contains(out, `json:"course_ids"`) {
 		t.Errorf("expected course_ids JSON field in M2M handler:\n%s", out)
 	}
@@ -1754,7 +1754,7 @@ func TestGenerateGinRoutes_NoM2M_NoJSON(t *testing.T) {
 	models := []Model{
 		{Name: "items", Fields: []Field{{Name: "name", Type: "text"}}},
 	}
-	out := GenerateGinRoutes(models, "routes", "myapp/models")
+	out := GenerateGinRoutes(models, "routes", "myapp/models", false)
 	if strings.Contains(out, `"encoding/json"`) {
 		t.Errorf("should not import encoding/json when no M2M:\n%s", out)
 	}

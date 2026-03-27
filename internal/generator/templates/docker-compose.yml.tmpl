@@ -4,18 +4,38 @@ services:
     ports:
       - "{{.Port}}:{{.Port}}"
     environment:
-      DB_HOST: postgres
+{{if .IsMySQL}}      DB_HOST: mysql
+      DB_PORT: 3306
+{{else}}      DB_HOST: postgres
       DB_PORT: 5432
-      DB_NAME: {{.DBName}}
+      DB_SSLMODE: disable
+{{end}}      DB_NAME: {{.DBName}}
       DB_USER: {{.DBUser}}
       DB_PASSWORD: {{.DBPassword}}
-      DB_SSLMODE: disable
     depends_on:
-      postgres:
-        condition: service_healthy
+{{if .IsMySQL}}      mysql:
+{{else}}      postgres:
+{{end}}        condition: service_healthy
     restart: unless-stopped
 
-  postgres:
+{{if .IsMySQL}}  mysql:
+    image: mysql:8
+    environment:
+      MYSQL_ROOT_PASSWORD: {{.DBPassword}}
+      MYSQL_DATABASE: {{.DBName}}
+      MYSQL_USER: {{.DBUser}}
+      MYSQL_PASSWORD: {{.DBPassword}}
+    ports:
+      - "{{.DBPort}}:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "{{.DBUser}}", "--password={{.DBPassword}}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+{{else}}  postgres:
     image: postgres:16-alpine
     environment:
       POSTGRES_USER: {{.DBUser}}
@@ -31,6 +51,8 @@ services:
       timeout: 5s
       retries: 5
     restart: unless-stopped
-
+{{end}}
 volumes:
-  postgres_data:
+{{if .IsMySQL}}  mysql_data:
+{{else}}  postgres_data:
+{{end}}

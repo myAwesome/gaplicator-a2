@@ -7,8 +7,9 @@ import (
 	"os"
 
 	"github.com/gin-gonic/gin"
-	"gorm.io/driver/postgres"
-	"gorm.io/gorm"
+{{if .IsMySQL}}	"gorm.io/driver/mysql"
+{{else}}	"gorm.io/driver/postgres"
+{{end}}	"gorm.io/gorm"
 
 	{{.ModelsImport}}
 	{{.RoutesImport}}
@@ -27,10 +28,16 @@ func main() {
 
 	dbPort := os.Getenv("DB_PORT")
 	if dbPort == "" {
-		dbPort = "5432"
-	}
+{{if .IsMySQL}}		dbPort = "3306"
+{{else}}		dbPort = "5432"
+{{end}}	}
 
-	dbSSLMode := os.Getenv("DB_SSLMODE")
+{{if .IsMySQL}}	dsn := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?charset=utf8mb4&parseTime=True&loc=Local",
+		os.Getenv("DB_USER"), os.Getenv("DB_PASSWORD"), dbHost, dbPort, dbName,
+	)
+
+	db, err := gorm.Open(mysql.Open(dsn), &gorm.Config{})
+{{else}}	dbSSLMode := os.Getenv("DB_SSLMODE")
 	if dbSSLMode == "" {
 		dbSSLMode = "disable"
 	}
@@ -41,7 +48,7 @@ func main() {
 	)
 
 	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
-	if err != nil {
+{{end}}	if err != nil {
 		log.Fatalf("connect db: %v", err)
 	}
 
@@ -72,8 +79,7 @@ func main() {
 	authenticated.Use(JWTMiddleware())
 	routes.RegisterRoutes(authenticated, db)
 {{else}}	routes.RegisterRoutes(r, db)
-{{end}}
-	if err := r.Run(":{{.Port}}"); err != nil {
+{{end}}	if err := r.Run(":{{.Port}}"); err != nil {
 		log.Fatalf("server: %v", err)
 	}
 }

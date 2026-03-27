@@ -45,7 +45,7 @@ func list{{.Singular}}(db *gorm.DB) gin.HandlerFunc {
 {{else}}		query := db.Model(&{{.Type}}{})
 {{end}}{{if .SearchColumns}}		if q := c.Query("q"); q != "" {
 			like := "%" + strings.ReplaceAll(q, "%", "\\%") + "%"
-			query = query.Where("{{range $i, $col := .SearchColumns}}{{if $i}} OR {{end}}{{$col}} ILIKE ?{{end}}", {{range $i, $col := .SearchColumns}}{{if $i}}, {{end}}like{{end}})
+			query = query.Where("{{range $i, $col := .SearchColumns}}{{if $i}} OR {{end}}{{$col}} {{$.LikeOp}} ?{{end}}", {{range $i, $col := .SearchColumns}}{{if $i}}, {{end}}like{{end}})
 		}
 {{end}}{{range .FilterColumns}}		if v := c.Query("{{.DBName}}"); v != "" {
 {{if .IsNumeric}}			if n, err := strconv.Atoi(v); err == nil {
