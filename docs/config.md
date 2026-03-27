@@ -1,6 +1,6 @@
 # Config Reference
 
-A Gaplicator config file is a YAML document with three top-level sections: `app`, `database`, and `models`.
+A Gaplicator config file is a YAML document with up to four top-level sections: `app`, `database`, `models`, and the optional `auth`.
 
 ```yaml
 app:
@@ -10,6 +10,9 @@ app:
 database:
   host: localhost
   name: my_db
+
+auth:               # optional — enables JWT authentication
+  model: users
 
 models:
   - name: posts
@@ -39,6 +42,61 @@ models:
 | `port` | int | no | `5432` | PostgreSQL port. Must be between 1 and 65535. |
 | `user` | string | no | `postgres` | Database user. |
 | `password` | string | no | `secret` | Database password. |
+
+---
+
+## `auth`
+
+Optional. When present, enables JWT-based authentication for the generated app.
+
+| Key | Type | Required | Description |
+|-----|------|----------|-------------|
+| `model` | string | yes | Name of the model used for login and registration. Must match one of the names in `models`. If the model does not exist in the `models` list, a default one is auto-created with `email` (varchar 255, unique), `password` (varchar 255), and `name` (varchar 100) fields. |
+
+**What gets generated when `auth` is set:**
+
+- **`auth.go`** — `POST /auth/register` and `POST /auth/login` handlers (bcrypt + JWT HS256), plus `JWTMiddleware` that validates the `Authorization: Bearer <token>` header
+- All model CRUD routes are mounted behind the JWT middleware — unauthenticated requests get `401`
+- **`go.mod`** — adds `golang-jwt/jwt/v5` and `golang.org/x/crypto`
+- **`.env`** — adds `JWT_SECRET=change-me-in-production`
+- **`models/models.go`** — the `password` field gets `json:"-"` so it is never included in API responses
+- **React client** — `AuthContext`, `LoginPage`, `RegisterPage`, `ProtectedRoute`, and `Authorization` headers on all fetch calls
+
+**Identity field** — the field used as the login identifier is auto-detected from the auth model: `email` takes priority over `username`, then the first `varchar`/`text` field.
+
+**Example:**
+
+```yaml
+auth:
+  model: users
+
+models:
+  - name: users          # declare explicitly to customise fields…
+    fields:
+      - name: email
+        type: varchar(255)
+        required: true
+        unique: true
+      - name: password
+        type: varchar(255)
+        required: true
+      - name: name
+        type: varchar(100)
+
+  # …or omit the model entirely and let Gaplicator create a default one:
+  # auth:
+  #   model: users
+  # (no users entry in models needed)
+```
+
+**Auth API:**
+
+| Method | Path | Body | Response |
+|--------|------|------|----------|
+| `POST` | `/auth/register` | `{"email": "...", "password": "..."}` | `{"id": 1}` |
+| `POST` | `/auth/login` | `{"email": "...", "password": "..."}` | `{"token": "<jwt>"}` |
+
+Tokens expire after 24 hours. Pass them as `Authorization: Bearer <token>`.
 
 ---
 
@@ -119,4 +177,4 @@ Every generated list endpoint supports filtering, full-text search, sorting, and
 
 ## Full example
 
-See [`docs/example.yaml`](example.yaml) for a working multi-model config.
+See [`docs/example.yaml`](example.yaml) for a working multi-model config, or [`docs/examples/beer-tracker.yaml`](examples/beer-tracker.yaml) for a more complex example with enums, foreign keys, and many-to-many relationships.

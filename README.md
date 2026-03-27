@@ -34,6 +34,9 @@ database:
   user: postgres   # optional, default: postgres
   password: secret # optional, default: secret
 
+auth:                  # optional: enables JWT authentication
+  model: users         # model used for login/register (auto-created if not in models list)
+
 models:
   - name: posts        # plural snake_case → table name; must be unique
     fields:
@@ -95,17 +98,17 @@ Running `gapp build app.yaml` produces:
 ```
 dist/
 ├── main.go                        # Gin server + GORM auto-migrate
+├── auth.go                        # JWT handlers — only with auth: config
 ├── go.mod                         # module with gin/gorm/postgres deps
 ├── docker-compose.yml             # app + postgres services
-├── .env                           # DB credentials
+├── .env                           # DB credentials (+ JWT_SECRET with auth:)
 ├── dev.sh                         # one-command dev startup (see below)
 ├── shutdown.sh                    # stops docker containers
-├── schema.sql                     # CREATE TABLE statements
 ├── migrations/
 │   ├── 001_initial.up.sql
 │   └── 001_initial.down.sql
 ├── models/
-│   └── models.go                  # GORM structs (snake_case JSON tags)
+│   └── models.go                  # GORM structs (password field hidden with json:"-")
 ├── routes/
 │   └── routes.go                  # Gin CRUD handlers
 └── client/                        # React + TypeScript frontend
@@ -115,14 +118,43 @@ dist/
     ├── tsconfig.json
     └── src/
         ├── main.tsx
-        ├── App.tsx                # nav + routes per model
+        ├── App.tsx                # nav + routes (ProtectedRoute wrapping with auth:)
+        ├── context/
+        │   └── AuthContext.tsx   # AuthProvider, useAuth, getToken — only with auth:
         ├── types/
         │   └── {model}.ts        # TypeScript interfaces
         ├── api/
-        │   └── {model}.ts        # fetch wrappers (list/get/create/update/delete/batch-delete)
+        │   ├── auth.ts           # login/register fetch functions — only with auth:
+        │   └── {model}.ts        # fetch wrappers (Authorization header with auth:)
         └── pages/
+            ├── LoginPage.tsx     # only with auth:
+            ├── RegisterPage.tsx  # only with auth:
             └── {Model}Page.tsx   # CRUD table + inline form
 ```
+
+## Authentication
+
+Add `auth:` to your config to enable JWT-based authentication. All model CRUD routes are automatically protected — unauthenticated requests receive `401 Unauthorized`.
+
+```yaml
+auth:
+  model: users   # auto-created with email + password + name if not declared
+```
+
+**Auth endpoints** (always public):
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `POST` | `/auth/register` | Register — body: `{"email": "...", "password": "..."}` |
+| `POST` | `/auth/login` | Login — returns `{"token": "<jwt>"}` |
+
+The JWT token is valid for 24 hours and must be sent as `Authorization: Bearer <token>` on all model routes. The secret is read from the `JWT_SECRET` environment variable (set in the generated `.env`).
+
+The React client stores the token in `localStorage`, wraps all model pages in a `ProtectedRoute` (redirects to `/login`), and sends the token automatically on every API call.
+
+**Identity field** is auto-detected from the auth model: `email` takes priority over `username`, then the first `varchar`/`text` field.
+
+---
 
 ## Generated API
 
