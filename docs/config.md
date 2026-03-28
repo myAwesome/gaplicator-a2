@@ -116,13 +116,14 @@ Tokens expire after 24 hours. Pass them as `Authorization: Bearer <token>`.
 
 A list of data models. Each model maps to a database table and gets full CRUD routes and a React page.
 
-| Key | Type | Required | Description |
-|-----|------|----------|-------------|
-| `name` | string | yes | Table name in plural snake_case (e.g. `blog_posts`). Must be unique across all models. |
-| `fields` | list | yes | At least one field required. |
-| `many_to_many` | list of strings | no | Names of other models to relate through a join table. The join table is auto-created and named by sorting both model names alphabetically (e.g. `courses` + `students` → `courses_students`). The referenced model must exist in the same config. |
+| Key | Type | Required | Default | Description |
+|-----|------|----------|---------|-------------|
+| `name` | string | yes | — | Table name in plural snake_case (e.g. `blog_posts`). Must be unique across all models. |
+| `timestamps` | bool | no | `false` | When `true`, adds `created_at`, `updated_at`, and `deleted_at` (soft-delete) columns to the table, a `Base` struct embedding in the GORM model, timestamp fields in the TypeScript interface, and `created_at`/`updated_at` as valid `sort_by` options. |
+| `fields` | list | yes | — | At least one field required. |
+| `many_to_many` | list of strings | no | — | Names of other models to relate through a join table. The join table is auto-created and named by sorting both model names alphabetically (e.g. `courses` + `students` → `courses_students`). The referenced model must exist in the same config. |
 
-All models automatically include `id`, `created_at`, `updated_at`, and `deleted_at` (soft delete) — do not declare these manually.
+All models automatically include an `id` primary key. The field names `id`, `created_at`, `updated_at`, and `deleted_at` are reserved — declaring them manually in `fields` is a validation error.
 
 ### `models[].fields`
 
@@ -178,12 +179,12 @@ Every generated list endpoint supports filtering, full-text search, sorting, and
 |-----------|-------------|
 | `q` | Full-text search across all text-type fields. |
 | `<field_name>` | Filter by the exact value of that field (numeric, enum, boolean, or FK). |
-| `sort_by` | Sort by any field name, or `id`, `created_at`, `updated_at`. Default: `id`. |
+| `sort_by` | Sort by any field name, or `id`. When the model has `timestamps: true`, also accepts `created_at` and `updated_at`. Default: `id`. |
 | `sort_dir` | Sort direction: `asc` or `desc`. Default: `desc`. |
 | `page` | Page number (1-based). Default: `1`. |
 | `limit` | Results per page. Default: `20`, max: `100`. |
 
-**Example:** `GET /posts?q=hello&status=draft&author_id=5&sort_by=created_at&sort_dir=desc&page=2&limit=20`
+**Example:** `GET /posts?q=hello&status=draft&author_id=5&sort_by=id&sort_dir=desc&page=2&limit=20`
 
 ---
 

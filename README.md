@@ -40,6 +40,7 @@ auth:                  # optional: enables JWT authentication
 
 models:
   - name: posts        # plural snake_case → table name; must be unique
+    timestamps: true   # optional: adds created_at, updated_at, deleted_at (soft delete). Default: false
     fields:
       - name: title
         type: varchar(200)
@@ -52,9 +53,6 @@ models:
       - name: published
         type: boolean
         default: false
-      - name: created_at
-        type: timestamp
-        index: true            # optional: creates a non-unique database index
       - name: author_id
         type: int
         references: users.id   # FK → must reference an existing model and field
@@ -88,9 +86,10 @@ Model attributes:
 
 | Attribute | Description |
 |-----------|-------------|
+| `timestamps` | `true` to add `created_at`, `updated_at`, and `deleted_at` (soft delete) columns. Default: `false`. |
 | `many_to_many` | List of other model names to relate through an auto-named join table (names sorted alphabetically, e.g. `posts` + `tags` → `posts_tags`) |
 
-All models include auto-managed `id`, `created_at`, `updated_at`, and `deleted_at` (soft delete) fields via GORM.
+All models include an auto-generated `id` primary key. The field names `id`, `created_at`, `updated_at`, and `deleted_at` are reserved and cannot be declared manually.
 
 ## What gets generated
 
@@ -178,12 +177,12 @@ Every list endpoint supports filtering, full-text search, sorting, and paginatio
 |-----------|-------------|
 | `q` | Full-text search across all text-type fields (case-insensitive) |
 | `<field_name>` | Filter by exact value (numeric, enum, boolean, or foreign key) |
-| `sort_by` | Field to sort by, or `id`, `created_at`, `updated_at`. Default: `id` |
+| `sort_by` | Field to sort by, or `id`. When `timestamps: true`, also accepts `created_at` and `updated_at`. Default: `id` |
 | `sort_dir` | `asc` or `desc`. Default: `desc` |
 | `page` | Page number (1-based). Default: `1` |
 | `limit` | Results per page. Default: `20`, max: `100` |
 
-**Example:** `GET /posts?q=hello&status=draft&author_id=5&sort_by=created_at&sort_dir=desc&page=2&limit=20`
+**Example:** `GET /posts?q=hello&status=draft&author_id=5&sort_by=title&sort_dir=desc&page=2&limit=20`
 
 The React frontend generates corresponding UI controls: a search input, filter dropdowns for enum/boolean/FK fields, sortable column headers, pagination, and checkbox-based batch delete.
 
