@@ -472,7 +472,7 @@ func TestGenerateGORMModels_SnakeCaseJSONTags(t *testing.T) {
 
 func TestGenerateGORMModels_BaseStructWithSnakeCaseTags(t *testing.T) {
 	models := []Model{
-		{Name: "items", Fields: []Field{{Name: "title", Type: "text"}}},
+		{Name: "items", Timestamps: boolPtr(true), Fields: []Field{{Name: "title", Type: "text"}}},
 	}
 	out := GenerateGORMModels(models, "models", nil)
 
@@ -533,7 +533,8 @@ func min(a, b int) int {
 // ── React client generation tests ──────────────────────────────────────────
 
 var clientTestModel = Model{
-	Name: "students",
+	Name:       "students",
+	Timestamps: boolPtr(true),
 	Fields: []Field{
 		{Name: "first_name", Type: "varchar(100)", Required: true},
 		{Name: "last_name", Type: "varchar(100)", Required: true},
@@ -734,7 +735,7 @@ func TestGenerateReactViteConfig_Proxy(t *testing.T) {
 
 func TestGenerateGORMModels_JSONTags(t *testing.T) {
 	models := []Model{
-		{Name: "students", Fields: []Field{
+		{Name: "students", Timestamps: boolPtr(true), Fields: []Field{
 			{Name: "first_name", Type: "varchar(100)", Required: true},
 			{Name: "score", Type: "int"},
 		}},
@@ -1611,7 +1612,7 @@ func TestValidateConfig_M2M_SelfReference(t *testing.T) {
 
 func TestGenerateMigrationUp_MySQL_BaseColumns(t *testing.T) {
 	models := []Model{
-		{Name: "users", Fields: []Field{{Name: "email", Type: "varchar(255)", Required: true}}},
+		{Name: "users", Timestamps: boolPtr(true), Fields: []Field{{Name: "email", Type: "varchar(255)", Required: true}}},
 	}
 	out := GenerateMigrationUp(models, "mysql")
 	for _, col := range []string{"created_at DATETIME", "updated_at DATETIME", "deleted_at DATETIME"} {
@@ -2383,26 +2384,15 @@ func TestValidateConfig_ReservedFieldName(t *testing.T) {
 	}
 }
 
-func TestGenerateMigrationUp_WithTimestamps_Default(t *testing.T) {
+func TestGenerateMigrationUp_WithoutTimestamps_Default(t *testing.T) {
+	// timestamps defaults to false (not set = no timestamps)
 	models := []Model{
 		{Name: "posts", Fields: []Field{{Name: "title", Type: "text", Required: true}}},
 	}
 	out := GenerateMigrationUp(models, "postgres")
-	for _, want := range []string{"created_at TIMESTAMP", "updated_at TIMESTAMP", "deleted_at TIMESTAMP"} {
-		if !strings.Contains(out, want) {
-			t.Errorf("expected %q in default migration output", want)
-		}
-	}
-}
-
-func TestGenerateMigrationUp_WithoutTimestamps(t *testing.T) {
-	models := []Model{
-		{Name: "posts", Timestamps: boolPtr(false), Fields: []Field{{Name: "title", Type: "text", Required: true}}},
-	}
-	out := GenerateMigrationUp(models, "postgres")
 	for _, notWant := range []string{"created_at", "updated_at", "deleted_at"} {
 		if strings.Contains(out, notWant) {
-			t.Errorf("expected no %q when timestamps:false, but found it in:\n%s", notWant, out)
+			t.Errorf("expected no %q in default (no timestamps) migration output", notWant)
 		}
 	}
 	if !strings.Contains(out, "id SERIAL PRIMARY KEY") {
@@ -2410,70 +2400,84 @@ func TestGenerateMigrationUp_WithoutTimestamps(t *testing.T) {
 	}
 }
 
-func TestGenerateMigrationUp_WithoutTimestamps_MySQL(t *testing.T) {
+func TestGenerateMigrationUp_WithTimestamps_Explicit(t *testing.T) {
 	models := []Model{
-		{Name: "posts", Timestamps: boolPtr(false), Fields: []Field{{Name: "title", Type: "text", Required: true}}},
+		{Name: "posts", Timestamps: boolPtr(true), Fields: []Field{{Name: "title", Type: "text", Required: true}}},
 	}
-	out := GenerateMigrationUp(models, "mysql")
-	for _, notWant := range []string{"created_at", "updated_at", "deleted_at"} {
-		if strings.Contains(out, notWant) {
-			t.Errorf("mysql: expected no %q when timestamps:false", notWant)
+	out := GenerateMigrationUp(models, "postgres")
+	for _, want := range []string{"created_at TIMESTAMP", "updated_at TIMESTAMP", "deleted_at TIMESTAMP"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("expected %q when timestamps:true", want)
 		}
 	}
 }
 
-func TestGenerateGORMModels_WithoutTimestamps(t *testing.T) {
+func TestGenerateMigrationUp_WithTimestamps_MySQL(t *testing.T) {
 	models := []Model{
-		{Name: "items", Timestamps: boolPtr(false), Fields: []Field{{Name: "name", Type: "text"}}},
+		{Name: "posts", Timestamps: boolPtr(true), Fields: []Field{{Name: "title", Type: "text", Required: true}}},
+	}
+	out := GenerateMigrationUp(models, "mysql")
+	for _, want := range []string{"created_at DATETIME", "updated_at DATETIME", "deleted_at DATETIME"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("mysql: expected %q when timestamps:true", want)
+		}
+	}
+}
+
+func TestGenerateGORMModels_WithoutTimestamps_Default(t *testing.T) {
+	// default: no timestamps
+	models := []Model{
+		{Name: "items", Fields: []Field{{Name: "name", Type: "text"}}},
 	}
 	out := GenerateGORMModels(models, "models", nil)
 	if strings.Contains(out, "Base") {
-		t.Error("Base struct should not appear when timestamps:false")
+		t.Error("Base struct should not appear when timestamps not set (default false)")
 	}
 	if strings.Contains(out, "gorm.io/gorm") {
-		t.Error("gorm.io/gorm import should not appear when timestamps:false and no soft-delete")
+		t.Error("gorm.io/gorm import should not appear when timestamps not set")
 	}
 	if !strings.Contains(out, `gorm:"primarykey"`) {
 		t.Error("expected inline ID field with primarykey tag")
 	}
 }
 
-func TestGenerateGORMModels_WithTimestamps_Default(t *testing.T) {
+func TestGenerateGORMModels_WithTimestamps_Explicit(t *testing.T) {
 	models := []Model{
-		{Name: "items", Fields: []Field{{Name: "name", Type: "text"}}},
+		{Name: "items", Timestamps: boolPtr(true), Fields: []Field{{Name: "name", Type: "text"}}},
 	}
 	out := GenerateGORMModels(models, "models", nil)
 	if !strings.Contains(out, "type Base struct") {
-		t.Error("expected Base struct when timestamps enabled (default)")
+		t.Error("expected Base struct when timestamps:true")
 	}
 	if !strings.Contains(out, "gorm.io/gorm") {
-		t.Error("expected gorm.io/gorm import when timestamps enabled")
+		t.Error("expected gorm.io/gorm import when timestamps:true")
 	}
 }
 
-func TestGenerateReactTypes_WithoutTimestamps(t *testing.T) {
-	m := Model{
-		Name:       "items",
-		Timestamps: boolPtr(false),
-		Fields:     []Field{{Name: "name", Type: "text", Required: true}},
-	}
-	out := GenerateReactTypes(m, nil)
-	for _, notWant := range []string{"created_at", "updated_at", "deleted_at"} {
-		if strings.Contains(out, notWant) {
-			t.Errorf("expected no %q in types when timestamps:false", notWant)
-		}
-	}
-}
-
-func TestGenerateReactTypes_WithTimestamps_Default(t *testing.T) {
+func TestGenerateReactTypes_WithoutTimestamps_Default(t *testing.T) {
+	// default: no timestamps
 	m := Model{
 		Name:   "items",
 		Fields: []Field{{Name: "name", Type: "text", Required: true}},
 	}
 	out := GenerateReactTypes(m, nil)
+	for _, notWant := range []string{"created_at", "updated_at", "deleted_at"} {
+		if strings.Contains(out, notWant) {
+			t.Errorf("expected no %q in types when timestamps not set (default false)", notWant)
+		}
+	}
+}
+
+func TestGenerateReactTypes_WithTimestamps_Explicit(t *testing.T) {
+	m := Model{
+		Name:       "items",
+		Timestamps: boolPtr(true),
+		Fields:     []Field{{Name: "name", Type: "text", Required: true}},
+	}
+	out := GenerateReactTypes(m, nil)
 	for _, want := range []string{"created_at", "updated_at", "deleted_at"} {
 		if !strings.Contains(out, want) {
-			t.Errorf("expected %q in types when timestamps enabled (default)", want)
+			t.Errorf("expected %q in types when timestamps:true", want)
 		}
 	}
 }

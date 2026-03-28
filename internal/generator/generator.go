@@ -77,7 +77,7 @@ type Model struct {
 }
 
 func modelHasTimestamps(m Model) bool {
-	return m.Timestamps == nil || *m.Timestamps
+	return m.Timestamps != nil && *m.Timestamps
 }
 
 type Field struct {
