@@ -28,8 +28,8 @@
 }
 
 html, body {
-  height: 100%;
-  overflow: hidden;
+  margin: 0;
+  padding: 0;
   background: var(--bg);
   color: var(--text);
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', sans-serif;
@@ -39,18 +39,15 @@ html, body {
 }
 
 #root {
-  height: 100%;
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
+  display: contents;
 }
 
 /* ---------- Layout ---------- */
 .app-layout {
+  height: 100vh;
   display: flex;
   flex-direction: column;
-  flex: 1;
-  min-height: 0;
+  overflow: hidden;
 }
 
 .app-header {
@@ -89,14 +86,12 @@ html, body {
 .app-body {
   display: flex;
   flex: 1;
-  min-height: 0;
   overflow: hidden;
 }
 
 .form-panel {
   flex: 1;
   min-width: 0;
-  min-height: 0;
   overflow-y: auto;
   padding: 24px;
   padding-right: 20px;
@@ -108,10 +103,10 @@ html, body {
 .preview-panel {
   width: 400px;
   flex-shrink: 0;
-  min-height: 0;
   border-left: 1px solid var(--border);
   display: flex;
   flex-direction: column;
+  overflow: hidden;
   background: var(--bg-card);
 }
 
