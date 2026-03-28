@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, NavLink{{if .HasAuth}}, Navigate{{end}} } from 'react-router-dom';
 {{range .Models}}import {{.StructName}}Page from './pages/{{.StructName}}Page';
 {{end}}{{if .HasAuth}}import LoginPage from './pages/LoginPage';
@@ -9,13 +10,39 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   return isAuthenticated ? <>{children}</> : <Navigate to="/login" replace />;
 }
 
-{{end}}export default function App() {
+{{end}}function ThemeToggle() {
+  const [dark, setDark] = useState(() => {
+    const stored = localStorage.getItem('theme');
+    if (stored === 'dark') return true;
+    if (stored === 'light') return false;
+    return window.matchMedia('(prefers-color-scheme: dark)').matches;
+  });
+
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
+    localStorage.setItem('theme', dark ? 'dark' : 'light');
+  }, [dark]);
+
+  return (
+    <button
+      className="btn-theme-toggle"
+      onClick={() => setDark(d => !d)}
+      title={dark ? 'Switch to light mode' : 'Switch to dark mode'}
+    >
+      {dark ? '☀' : '☾'}
+    </button>
+  );
+}
+
+export default function App() {
   return (
 {{if .HasAuth}}    <AuthProvider>
 {{end}}    <BrowserRouter>
       <nav className="app-nav">
 {{range .Models}}        <NavLink to="/{{.Name}}" className={({ isActive }) => isActive ? 'active' : ''}>{{.StructName}}</NavLink>
-{{end}}{{if .HasAuth}}        <LogoutButton />
+{{end}}        <span className="nav-spacer" />
+        <ThemeToggle />
+{{if .HasAuth}}        <LogoutButton />
 {{end}}      </nav>
       <main className="app-main">
         <Routes>

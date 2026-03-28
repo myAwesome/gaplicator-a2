@@ -1,3 +1,128 @@
+/* === CSS Variables (light theme defaults) === */
+:root {
+  --bg-page:             #f5f7fa;
+  --bg-card:             #ffffff;
+  --bg-input:            #ffffff;
+  --bg-nav:              #1a1a2e;
+  --bg-nav-border:       #16213e;
+  --bg-table-head:       #f8fafc;
+  --bg-table-row-hover:  #f8fafc;
+  --border:              #e2e8f0;
+  --border-input:        #d0d7de;
+  --border-row:          #f1f5f9;
+  --text-primary:        #1a1a2e;
+  --text-secondary:      #64748b;
+  --text-table:          #374151;
+  --text-heading:        #1e293b;
+  --accent:              #0f3460;
+  --accent-hover:        #16213e;
+  --focus-ring:          rgba(15, 52, 96, 0.12);
+  --btn-bg:              #ffffff;
+  --btn-border:          #d0d7de;
+  --btn-color:           #24292f;
+  --btn-hover-bg:        #f3f4f6;
+  --btn-hover-border:    #b6bec7;
+  --btn-danger-border:   #fca5a5;
+  --btn-danger-color:    #dc2626;
+  --btn-danger-hover-bg: #fef2f2;
+  --logout-border:       #cbd5e1;
+  --logout-color:        #64748b;
+  --logout-hover-bg:     #f1f5f9;
+  --auth-shadow:         rgba(0, 0, 0, 0.06);
+  --err-bg:              #fee2e2;
+  --err-color:           #991b1b;
+  --link:                #3b82f6;
+  --badge-bg:            #e2e8f0;
+  --badge-color:         #475569;
+  --sort-active:         #3b82f6;
+  --sort-hover-bg:       #f1f5f9;
+  --sort-hover-color:    #334155;
+}
+
+/* === Night theme === */
+:root[data-theme="dark"] {
+  --bg-page:             #0f1117;
+  --bg-card:             #1a1d27;
+  --bg-input:            #12141c;
+  --bg-nav:              #12141c;
+  --bg-nav-border:       #2a2d3e;
+  --bg-table-head:       #12141c;
+  --bg-table-row-hover:  #1f2235;
+  --border:              #2a2d3e;
+  --border-input:        #2a2d3e;
+  --border-row:          #1f2235;
+  --text-primary:        #e2e8f0;
+  --text-secondary:      #8892a4;
+  --text-table:          #cbd5e1;
+  --text-heading:        #e2e8f0;
+  --accent:              #4f6ef7;
+  --accent-hover:        #3d5af1;
+  --focus-ring:          rgba(79, 110, 247, 0.18);
+  --btn-bg:              #1a1d27;
+  --btn-border:          #2a2d3e;
+  --btn-color:           #e2e8f0;
+  --btn-hover-bg:        #1f2235;
+  --btn-hover-border:    #3a3d4e;
+  --btn-danger-border:   #f06060;
+  --btn-danger-color:    #f06060;
+  --btn-danger-hover-bg: #2a1a1a;
+  --logout-border:       #2a2d3e;
+  --logout-color:        #8892a4;
+  --logout-hover-bg:     #1f2235;
+  --auth-shadow:         rgba(0, 0, 0, 0.3);
+  --err-bg:              #2a1a1a;
+  --err-color:           #f06060;
+  --link:                #4f6ef7;
+  --badge-bg:            #1f2235;
+  --badge-color:         #8892a4;
+  --sort-active:         #4f6ef7;
+  --sort-hover-bg:       #1f2235;
+  --sort-hover-color:    #e2e8f0;
+}
+
+/* Automatic night theme when JS is disabled */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]):not([data-theme="dark"]) {
+    --bg-page:             #0f1117;
+    --bg-card:             #1a1d27;
+    --bg-input:            #12141c;
+    --bg-nav:              #12141c;
+    --bg-nav-border:       #2a2d3e;
+    --bg-table-head:       #12141c;
+    --bg-table-row-hover:  #1f2235;
+    --border:              #2a2d3e;
+    --border-input:        #2a2d3e;
+    --border-row:          #1f2235;
+    --text-primary:        #e2e8f0;
+    --text-secondary:      #8892a4;
+    --text-table:          #cbd5e1;
+    --text-heading:        #e2e8f0;
+    --accent:              #4f6ef7;
+    --accent-hover:        #3d5af1;
+    --focus-ring:          rgba(79, 110, 247, 0.18);
+    --btn-bg:              #1a1d27;
+    --btn-border:          #2a2d3e;
+    --btn-color:           #e2e8f0;
+    --btn-hover-bg:        #1f2235;
+    --btn-hover-border:    #3a3d4e;
+    --btn-danger-border:   #f06060;
+    --btn-danger-color:    #f06060;
+    --btn-danger-hover-bg: #2a1a1a;
+    --logout-border:       #2a2d3e;
+    --logout-color:        #8892a4;
+    --logout-hover-bg:     #1f2235;
+    --auth-shadow:         rgba(0, 0, 0, 0.3);
+    --err-bg:              #2a1a1a;
+    --err-color:           #f06060;
+    --link:                #4f6ef7;
+    --badge-bg:            #1f2235;
+    --badge-color:         #8892a4;
+    --sort-active:         #4f6ef7;
+    --sort-hover-bg:       #1f2235;
+    --sort-hover-color:    #e2e8f0;
+  }
+}
+
 /* === Reset & base === */
 *, *::before, *::after {
   box-sizing: border-box;
@@ -7,8 +132,9 @@ body {
   margin: 0;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   font-size: 14px;
-  color: #1a1a2e;
-  background: #f5f7fa;
+  color: var(--text-primary);
+  background: var(--bg-page);
+  transition: background 0.2s, color 0.2s;
 }
 
 /* === Nav === */
@@ -17,9 +143,9 @@ body {
   align-items: center;
   gap: 4px;
   padding: 0 24px;
-  background: #1a1a2e;
+  background: var(--bg-nav);
   height: 52px;
-  border-bottom: 2px solid #16213e;
+  border-bottom: 2px solid var(--bg-nav-border);
 }
 
 .app-nav a {
@@ -39,7 +165,28 @@ body {
 
 .app-nav a.active {
   color: #fff;
-  background: #0f3460;
+  background: var(--accent);
+}
+
+/* === Theme toggle === */
+.nav-spacer { flex: 1; }
+
+.btn-theme-toggle {
+  padding: 5px 10px;
+  font-size: 15px;
+  line-height: 1;
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 6px;
+  cursor: pointer;
+  color: #a0aec0;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.btn-theme-toggle:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.35);
+  color: #fff;
 }
 
 /* === Main content === */
@@ -61,7 +208,7 @@ body {
   margin: 0;
   font-size: 22px;
   font-weight: 600;
-  color: #1a1a2e;
+  color: var(--text-heading);
   text-transform: capitalize;
 }
 
@@ -73,17 +220,17 @@ body {
   padding: 7px 16px;
   font-size: 13px;
   font-weight: 500;
-  border: 1px solid #d0d7de;
+  border: 1px solid var(--btn-border);
   border-radius: 6px;
-  background: #fff;
-  color: #24292f;
+  background: var(--btn-bg);
+  color: var(--btn-color);
   cursor: pointer;
   transition: background 0.15s, border-color 0.15s;
 }
 
 .btn:hover:not(:disabled) {
-  background: #f3f4f6;
-  border-color: #b6bec7;
+  background: var(--btn-hover-bg);
+  border-color: var(--btn-hover-border);
 }
 
 .btn:disabled {
@@ -92,24 +239,24 @@ body {
 }
 
 .btn-primary {
-  background: #0f3460;
-  border-color: #0f3460;
+  background: var(--accent);
+  border-color: var(--accent);
   color: #fff;
 }
 
 .btn-primary:hover:not(:disabled) {
-  background: #16213e;
-  border-color: #16213e;
+  background: var(--accent-hover);
+  border-color: var(--accent-hover);
 }
 
 .btn-danger {
-  background: #fff;
-  border-color: #fca5a5;
-  color: #dc2626;
+  background: var(--btn-bg);
+  border-color: var(--btn-danger-border);
+  color: var(--btn-danger-color);
 }
 
 .btn-danger:hover:not(:disabled) {
-  background: #fef2f2;
+  background: var(--btn-danger-hover-bg);
 }
 
 .btn-sm {
@@ -119,8 +266,8 @@ body {
 
 /* === Form card === */
 .form-card {
-  background: #fff;
-  border: 1px solid #e2e8f0;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
   border-radius: 10px;
   padding: 24px;
   margin-bottom: 28px;
@@ -146,7 +293,7 @@ body {
 .form-label {
   font-size: 12px;
   font-weight: 600;
-  color: #64748b;
+  color: var(--text-secondary);
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }
@@ -155,10 +302,10 @@ body {
 .form-select {
   padding: 8px 12px;
   font-size: 14px;
-  border: 1px solid #d0d7de;
+  border: 1px solid var(--border-input);
   border-radius: 6px;
-  background: #fff;
-  color: #1a1a2e;
+  background: var(--bg-input);
+  color: var(--text-primary);
   outline: none;
   transition: border-color 0.15s, box-shadow 0.15s;
   width: 100%;
@@ -166,8 +313,8 @@ body {
 
 .form-input:focus,
 .form-select:focus {
-  border-color: #0f3460;
-  box-shadow: 0 0 0 3px rgba(15, 52, 96, 0.12);
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--focus-ring);
 }
 
 .form-actions {
@@ -182,15 +329,15 @@ body {
 .data-table {
   width: 100%;
   border-collapse: collapse;
-  background: #fff;
-  border: 1px solid #e2e8f0;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
   border-radius: 10px;
   overflow: hidden;
   font-size: 13px;
 }
 
 .data-table thead {
-  background: #f8fafc;
+  background: var(--bg-table-head);
 }
 
 .data-table th {
@@ -198,10 +345,10 @@ body {
   text-align: left;
   font-size: 11px;
   font-weight: 700;
-  color: #64748b;
+  color: var(--text-secondary);
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  border-bottom: 1px solid #e2e8f0;
+  border-bottom: 1px solid var(--border);
 }
 
 .data-table th.sortable {
@@ -211,18 +358,18 @@ body {
 }
 
 .data-table th.sortable:hover {
-  color: #334155;
-  background: #f1f5f9;
+  color: var(--sort-hover-color);
+  background: var(--sort-hover-bg);
 }
 
 .data-table th.sorted {
-  color: #3b82f6;
+  color: var(--sort-active);
 }
 
 .data-table td {
   padding: 11px 14px;
-  border-bottom: 1px solid #f1f5f9;
-  color: #374151;
+  border-bottom: 1px solid var(--border-row);
+  color: var(--text-table);
 }
 
 .data-table tbody tr:last-child td {
@@ -230,7 +377,7 @@ body {
 }
 
 .data-table tbody tr:hover {
-  background: #f8fafc;
+  background: var(--bg-table-row-hover);
 }
 
 .data-table .row-actions {
@@ -250,7 +397,7 @@ body {
 
 .pagination span {
   font-size: 13px;
-  color: #64748b;
+  color: var(--text-secondary);
 }
 
 /* === Badges === */
@@ -262,8 +409,8 @@ body {
   font-weight: 600;
   border-radius: 99px;
   text-transform: capitalize;
-  background: #e2e8f0;
-  color: #475569;
+  background: var(--badge-bg);
+  color: var(--badge-color);
 }
 
 .badge--draft     { background: #fef9c3; color: #854d0e; }
@@ -273,19 +420,33 @@ body {
 .badge--archived  { background: #f1f5f9; color: #64748b; }
 .badge--inactive  { background: #fee2e2; color: #991b1b; }
 
-/* ── Auth pages ─────────────────────────────────────────────────────── */
-.nav-spacer { flex: 1; }
+:root[data-theme="dark"] .badge--draft,
+:root[data-theme="dark"] .badge--pending   { background: #3a2e00; color: #f0c060; }
+:root[data-theme="dark"] .badge--published,
+:root[data-theme="dark"] .badge--active    { background: #0d2a1a; color: #45c87e; }
+:root[data-theme="dark"] .badge--archived  { background: #1f2235; color: #8892a4; }
+:root[data-theme="dark"] .badge--inactive  { background: #2a1a1a; color: #f06060; }
 
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]):not([data-theme="dark"]) .badge--draft,
+  :root:not([data-theme="light"]):not([data-theme="dark"]) .badge--pending   { background: #3a2e00; color: #f0c060; }
+  :root:not([data-theme="light"]):not([data-theme="dark"]) .badge--published,
+  :root:not([data-theme="light"]):not([data-theme="dark"]) .badge--active    { background: #0d2a1a; color: #45c87e; }
+  :root:not([data-theme="light"]):not([data-theme="dark"]) .badge--archived  { background: #1f2235; color: #8892a4; }
+  :root:not([data-theme="light"]):not([data-theme="dark"]) .badge--inactive  { background: #2a1a1a; color: #f06060; }
+}
+
+/* ── Auth pages ─────────────────────────────────────────────────────── */
 .btn-logout {
   padding: 6px 14px;
   font-size: 13px;
   background: transparent;
-  border: 1px solid #cbd5e1;
+  border: 1px solid var(--logout-border);
   border-radius: 6px;
   cursor: pointer;
-  color: #64748b;
+  color: var(--logout-color);
 }
-.btn-logout:hover { background: #f1f5f9; }
+.btn-logout:hover { background: var(--logout-hover-bg); }
 
 .auth-page {
   display: flex;
@@ -295,25 +456,25 @@ body {
 }
 
 .auth-card {
-  background: #fff;
-  border: 1px solid #e2e8f0;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
   border-radius: 10px;
   padding: 36px 40px;
   width: 100%;
   max-width: 400px;
-  box-shadow: 0 2px 8px rgba(0,0,0,.06);
+  box-shadow: 0 2px 8px var(--auth-shadow);
 }
 
 .auth-title {
   font-size: 22px;
   font-weight: 600;
   margin: 0 0 20px;
-  color: #1e293b;
+  color: var(--text-heading);
 }
 
 .auth-error {
-  background: #fee2e2;
-  color: #991b1b;
+  background: var(--err-bg);
+  color: var(--err-color);
   border-radius: 6px;
   padding: 8px 12px;
   font-size: 13px;
@@ -325,8 +486,8 @@ body {
 .auth-footer {
   margin: 16px 0 0;
   font-size: 13px;
-  color: #64748b;
+  color: var(--text-secondary);
   text-align: center;
 }
-.auth-footer a { color: #3b82f6; text-decoration: none; }
+.auth-footer a { color: var(--link); text-decoration: none; }
 .auth-footer a:hover { text-decoration: underline; }
