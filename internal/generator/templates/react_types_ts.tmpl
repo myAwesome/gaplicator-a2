@@ -3,10 +3,10 @@
   id: number;
 {{range .Fields}}  {{.Name}}{{if not .Required}}?{{end}}: {{.TSType}};
 {{end}}{{range .M2MFields}}  {{.FieldName}}?: {{.TSType}}[];
-{{end}}  created_at: string;
+{{end}}{{if .HasTimestamps}}  created_at: string;
   updated_at: string;
   deleted_at?: string;
-}
+{{end}}}
 
 export type Create{{.StructName}}Input = {
 {{range .Fields}}  {{.Name}}: {{if .IsOptionalFK}}{{.TSType}} | null{{else}}{{.TSType}}{{end}};

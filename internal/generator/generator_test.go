@@ -2358,3 +2358,122 @@ models:
 		t.Error("expected users model to be auto-created")
 	}
 }
+
+// ── timestamps config tests ─────────────────────────────────────────────────
+
+func boolPtr(b bool) *bool { return &b }
+
+func TestValidateConfig_ReservedFieldName(t *testing.T) {
+	for _, reserved := range []string{"id", "created_at", "updated_at", "deleted_at"} {
+		cfg := &Config{
+			App:      AppConfig{Name: "myapp", Port: 8080},
+			Database: DatabaseConfig{Host: "localhost", Name: "db", Port: 5432},
+			Models: []Model{
+				{Name: "items", Fields: []Field{{Name: reserved, Type: "text"}}},
+			},
+		}
+		errs := ValidateConfig(cfg)
+		if len(errs) == 0 {
+			t.Errorf("expected error for reserved field name %q, got none", reserved)
+			continue
+		}
+		if !strings.Contains(errs[0].Error(), "reserved") {
+			t.Errorf("field %q: unexpected error: %v", reserved, errs[0])
+		}
+	}
+}
+
+func TestGenerateMigrationUp_WithTimestamps_Default(t *testing.T) {
+	models := []Model{
+		{Name: "posts", Fields: []Field{{Name: "title", Type: "text", Required: true}}},
+	}
+	out := GenerateMigrationUp(models, "postgres")
+	for _, want := range []string{"created_at TIMESTAMP", "updated_at TIMESTAMP", "deleted_at TIMESTAMP"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("expected %q in default migration output", want)
+		}
+	}
+}
+
+func TestGenerateMigrationUp_WithoutTimestamps(t *testing.T) {
+	models := []Model{
+		{Name: "posts", Timestamps: boolPtr(false), Fields: []Field{{Name: "title", Type: "text", Required: true}}},
+	}
+	out := GenerateMigrationUp(models, "postgres")
+	for _, notWant := range []string{"created_at", "updated_at", "deleted_at"} {
+		if strings.Contains(out, notWant) {
+			t.Errorf("expected no %q when timestamps:false, but found it in:\n%s", notWant, out)
+		}
+	}
+	if !strings.Contains(out, "id SERIAL PRIMARY KEY") {
+		t.Error("id column should still be present")
+	}
+}
+
+func TestGenerateMigrationUp_WithoutTimestamps_MySQL(t *testing.T) {
+	models := []Model{
+		{Name: "posts", Timestamps: boolPtr(false), Fields: []Field{{Name: "title", Type: "text", Required: true}}},
+	}
+	out := GenerateMigrationUp(models, "mysql")
+	for _, notWant := range []string{"created_at", "updated_at", "deleted_at"} {
+		if strings.Contains(out, notWant) {
+			t.Errorf("mysql: expected no %q when timestamps:false", notWant)
+		}
+	}
+}
+
+func TestGenerateGORMModels_WithoutTimestamps(t *testing.T) {
+	models := []Model{
+		{Name: "items", Timestamps: boolPtr(false), Fields: []Field{{Name: "name", Type: "text"}}},
+	}
+	out := GenerateGORMModels(models, "models", nil)
+	if strings.Contains(out, "Base") {
+		t.Error("Base struct should not appear when timestamps:false")
+	}
+	if strings.Contains(out, "gorm.io/gorm") {
+		t.Error("gorm.io/gorm import should not appear when timestamps:false and no soft-delete")
+	}
+	if !strings.Contains(out, `gorm:"primarykey"`) {
+		t.Error("expected inline ID field with primarykey tag")
+	}
+}
+
+func TestGenerateGORMModels_WithTimestamps_Default(t *testing.T) {
+	models := []Model{
+		{Name: "items", Fields: []Field{{Name: "name", Type: "text"}}},
+	}
+	out := GenerateGORMModels(models, "models", nil)
+	if !strings.Contains(out, "type Base struct") {
+		t.Error("expected Base struct when timestamps enabled (default)")
+	}
+	if !strings.Contains(out, "gorm.io/gorm") {
+		t.Error("expected gorm.io/gorm import when timestamps enabled")
+	}
+}
+
+func TestGenerateReactTypes_WithoutTimestamps(t *testing.T) {
+	m := Model{
+		Name:       "items",
+		Timestamps: boolPtr(false),
+		Fields:     []Field{{Name: "name", Type: "text", Required: true}},
+	}
+	out := GenerateReactTypes(m, nil)
+	for _, notWant := range []string{"created_at", "updated_at", "deleted_at"} {
+		if strings.Contains(out, notWant) {
+			t.Errorf("expected no %q in types when timestamps:false", notWant)
+		}
+	}
+}
+
+func TestGenerateReactTypes_WithTimestamps_Default(t *testing.T) {
+	m := Model{
+		Name:   "items",
+		Fields: []Field{{Name: "name", Type: "text", Required: true}},
+	}
+	out := GenerateReactTypes(m, nil)
+	for _, want := range []string{"created_at", "updated_at", "deleted_at"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("expected %q in types when timestamps enabled (default)", want)
+		}
+	}
+}

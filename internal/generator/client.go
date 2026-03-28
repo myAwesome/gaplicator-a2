@@ -261,17 +261,19 @@ func GenerateReactTypes(m Model, allModels []Model) string {
 	}
 
 	return execTmpl("react_types_ts", reactTypesTmpl, struct {
-		StructName  string
-		Fields      []typeField
-		M2MImports  []m2mImport
-		M2MFields   []m2mField
-		M2MIDFields []m2mIDField
+		StructName    string
+		HasTimestamps bool
+		Fields        []typeField
+		M2MImports    []m2mImport
+		M2MFields     []m2mField
+		M2MIDFields   []m2mIDField
 	}{
-		StructName:  toPascalCase(toSingular(m.Name)),
-		Fields:      fields,
-		M2MImports:  m2mImports,
-		M2MFields:   m2mFields,
-		M2MIDFields: m2mIDFields,
+		StructName:    toPascalCase(toSingular(m.Name)),
+		HasTimestamps: modelHasTimestamps(m),
+		Fields:        fields,
+		M2MImports:    m2mImports,
+		M2MFields:     m2mFields,
+		M2MIDFields:   m2mIDFields,
 	})
 }
 

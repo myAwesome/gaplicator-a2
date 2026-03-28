@@ -1,20 +1,20 @@
 package {{.PkgName}}
-
-import (
+{{if or .NeedsTimeImport .HasAnyTimestamps}}
+import ({{if .NeedsTimeImport}}
 	"time"
-
-	"gorm.io/gorm"
-)
-
+{{end}}{{if .HasAnyTimestamps}}	"gorm.io/gorm"
+{{end}})
+{{end}}{{if .HasAnyTimestamps}}
 type Base struct {
 	ID        uint           `gorm:"primarykey" json:"id"`
 	CreatedAt time.Time      `json:"created_at"`
 	UpdatedAt time.Time      `json:"updated_at"`
 	DeletedAt gorm.DeletedAt `gorm:"index" json:"deleted_at,omitempty"`
 }
+{{end}}
 {{range .Models}}
 type {{.StructName}} struct {
-	Base
+	{{if .HasTimestamps}}Base{{else}}ID uint `gorm:"primarykey" json:"id"`{{end}}
 {{range .Fields}}	{{printf "%-20s %-12s" .FieldName .GoType}}`{{.Tags}}`
 {{if .AssocField}}	{{printf "%-20s %-12s" .AssocField .AssocType}}`{{.AssocTags}}`
 {{end}}{{end}}{{range .M2MFields}}	{{printf "%-20s %-12s" .FieldName .SliceType}}`{{.Tags}}`

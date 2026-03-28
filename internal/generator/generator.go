@@ -71,8 +71,13 @@ type DatabaseConfig struct {
 
 type Model struct {
 	Name       string   `yaml:"name"`
+	Timestamps *bool    `yaml:"timestamps,omitempty"`
 	Fields     []Field  `yaml:"fields"`
 	ManyToMany []string `yaml:"many_to_many"`
+}
+
+func modelHasTimestamps(m Model) bool {
+	return m.Timestamps == nil || *m.Timestamps
 }
 
 type Field struct {
@@ -258,6 +263,7 @@ func ValidateConfig(cfg *Config) []error {
 			}
 		}
 
+		reservedFieldNames := map[string]bool{"id": true, "created_at": true, "updated_at": true, "deleted_at": true}
 		for fi, f := range m.Fields {
 			fprefix := fmt.Sprintf("%s field[%d]", prefix, fi)
 			if f.Name != "" {
@@ -268,6 +274,8 @@ func ValidateConfig(cfg *Config) []error {
 				errs = append(errs, fmt.Errorf("%s: name is required", fprefix))
 			} else if !validIdentRe.MatchString(f.Name) {
 				errs = append(errs, fmt.Errorf("%s: name must be lowercase snake_case (a-z, 0-9, _)", fprefix))
+			} else if reservedFieldNames[f.Name] {
+				errs = append(errs, fmt.Errorf("%s: field name %q is reserved and auto-generated", fprefix, f.Name))
 			}
 
 			if f.Type == "" {
@@ -348,9 +356,10 @@ type migrationIndex struct {
 }
 
 type migrationModel struct {
-	Name    string
-	Fields  []migrationField
-	Indexes []migrationIndex
+	Name          string
+	HasTimestamps bool
+	Fields        []migrationField
+	Indexes       []migrationIndex
 }
 
 type migrationData struct {
@@ -362,9 +371,9 @@ func buildMigrationData(models []Model, driver string) migrationData {
 	sorted := topoSort(models)
 	tableModels := make([]migrationModel, len(sorted))
 	for i, m := range sorted {
-		fields := make([]migrationField, len(m.Fields))
+		var migFields []migrationField
 		var indexes []migrationIndex
-		for j, f := range m.Fields {
+		for _, f := range m.Fields {
 			mf := migrationField{
 				Name:     f.Name,
 				SQLType:  fieldSQLType(f, driver),
@@ -381,7 +390,7 @@ func buildMigrationData(models []Model, driver string) migrationData {
 				mf.RefTable = parts[0]
 				mf.RefCol = parts[1]
 			}
-			fields[j] = mf
+			migFields = append(migFields, mf)
 			if f.Index && !f.Unique {
 				indexes = append(indexes, migrationIndex{
 					IndexName: fmt.Sprintf("idx_%s_%s", m.Name, f.Name),
@@ -390,7 +399,12 @@ func buildMigrationData(models []Model, driver string) migrationData {
 				})
 			}
 		}
-		tableModels[i] = migrationModel{Name: m.Name, Fields: fields, Indexes: indexes}
+		tableModels[i] = migrationModel{
+			Name:          m.Name,
+			HasTimestamps: modelHasTimestamps(m),
+			Fields:        migFields,
+			Indexes:       indexes,
+		}
 	}
 	return migrationData{Models: tableModels, JoinTables: collectJoinTables(models)}
 }
@@ -626,10 +640,11 @@ type gormM2MField struct {
 }
 
 type gormModelData struct {
-	StructName string
-	TableName  string
-	Fields     []gormFieldData
-	M2MFields  []gormM2MField
+	StructName    string
+	TableName     string
+	HasTimestamps bool
+	Fields        []gormFieldData
+	M2MFields     []gormM2MField
 }
 
 func GenerateGORMModels(models []Model, pkgName string, auth *AuthConfig) string {
@@ -688,13 +703,38 @@ func GenerateGORMModels(models []Model, pkgName string, auth *AuthConfig) string
 				})
 			}
 		}
-		modelData = append(modelData, gormModelData{StructName: structName, TableName: m.Name, Fields: fields, M2MFields: m2mFields})
+		modelData = append(modelData, gormModelData{
+			StructName:    structName,
+			TableName:     m.Name,
+			HasTimestamps: modelHasTimestamps(m),
+			Fields:        fields,
+			M2MFields:     m2mFields,
+		})
+	}
+
+	hasAnyTimestamps := false
+	needsTimeImport := false
+	for _, m := range models {
+		if modelHasTimestamps(m) {
+			hasAnyTimestamps = true
+			needsTimeImport = true
+		}
+		if !needsTimeImport {
+			for _, f := range m.Fields {
+				if sqlTypeToGo(f.Type) == "time.Time" {
+					needsTimeImport = true
+					break
+				}
+			}
+		}
 	}
 
 	data := struct {
-		PkgName string
-		Models  []gormModelData
-	}{PkgName: pkgName, Models: modelData}
+		PkgName          string
+		Models           []gormModelData
+		HasAnyTimestamps bool
+		NeedsTimeImport  bool
+	}{PkgName: pkgName, Models: modelData, HasAnyTimestamps: hasAnyTimestamps, NeedsTimeImport: needsTimeImport}
 
 	var buf strings.Builder
 	template.Must(template.New("gorm_models").Parse(gormModelsTmpl)).Execute(&buf, data) //nolint:errcheck
@@ -857,7 +897,10 @@ func GenerateGinRoutes(models []Model, pkgName string, modelsImport string, isMy
 	ginModels := make([]ginModelData, 0, len(models))
 	for _, m := range models {
 		s := toPascalCase(toSingular(m.Name))
-		sortCols := []string{"id", "created_at", "updated_at"}
+		sortCols := []string{"id"}
+		if modelHasTimestamps(m) {
+			sortCols = append(sortCols, "created_at", "updated_at")
+		}
 		var searchCols []string
 		var filterCols []ginFilterColumn
 		for _, f := range m.Fields {
