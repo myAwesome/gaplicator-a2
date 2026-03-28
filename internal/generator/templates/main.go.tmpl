@@ -11,7 +11,6 @@ import (
 {{else}}	"gorm.io/driver/postgres"
 {{end}}	"gorm.io/gorm"
 
-	{{.ModelsImport}}
 	{{.RoutesImport}}
 )
 
@@ -50,14 +49,6 @@ func main() {
 	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
 {{end}}	if err != nil {
 		log.Fatalf("connect db: %v", err)
-	}
-
-	if err := db.AutoMigrate(
-{{- range .Models}}
-		&models.{{.}}{},
-{{- end}}
-	); err != nil {
-		log.Fatalf("automigrate: %v", err)
 	}
 
 	r := gin.Default()

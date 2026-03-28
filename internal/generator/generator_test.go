@@ -212,7 +212,6 @@ func TestGenerateMain_PackageAndImports(t *testing.T) {
 		`"github.com/gin-gonic/gin"`,
 		`"gorm.io/driver/postgres"`,
 		`"gorm.io/gorm"`,
-		`"myapp/models"`,
 		`"myapp/routes"`,
 	} {
 		if !strings.Contains(out, want) {
@@ -262,30 +261,6 @@ func TestGenerateMain_DBPortDefault(t *testing.T) {
 	}
 }
 
-func TestGenerateMain_AutoMigrate(t *testing.T) {
-	cfg := &Config{
-		App:      AppConfig{Name: "myapp", Port: 8080},
-		Database: DatabaseConfig{Host: "localhost", Name: "mydb"},
-		Models: []Model{
-			{Name: "users", Fields: []Field{{Name: "name", Type: "text"}}},
-			{Name: "posts", Fields: []Field{{Name: "title", Type: "text"}}},
-		},
-	}
-	out, err := GenerateMain(cfg, "myapp")
-	if err != nil {
-		t.Fatalf("GenerateMain: %v", err)
-	}
-
-	for _, want := range []string{
-		"db.AutoMigrate(",
-		"&models.User{}",
-		"&models.Post{}",
-	} {
-		if !strings.Contains(out, want) {
-			t.Errorf("missing: %s", want)
-		}
-	}
-}
 
 func TestGenerateMain_RouterAndServer(t *testing.T) {
 	cfg := &Config{
@@ -1682,20 +1657,6 @@ func TestGenerateMigrationUp_JoinTable_Deduplicated(t *testing.T) {
 	}
 }
 
-func TestGenerateMigrationDown_JoinTableFirst(t *testing.T) {
-	out := GenerateMigrationDown(m2mTestModels)
-	joinIdx := strings.Index(out, "DROP TABLE IF EXISTS courses_students")
-	mainIdx := strings.Index(out, "DROP TABLE IF EXISTS students")
-	if joinIdx == -1 {
-		t.Fatalf("expected DROP for join table in migration down:\n%s", out)
-	}
-	if mainIdx == -1 {
-		t.Fatalf("expected DROP for students in migration down:\n%s", out)
-	}
-	if joinIdx > mainIdx {
-		t.Errorf("join table should be dropped before main tables:\n%s", out)
-	}
-}
 
 // ── GORM model M2M ────────────────────────────────────────────────────────────
 

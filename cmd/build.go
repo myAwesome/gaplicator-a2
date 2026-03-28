@@ -42,10 +42,7 @@ var buildCmd = &cobra.Command{
 				if err := os.MkdirAll(dir, 0755); err != nil {
 					return err
 				}
-				if err := writeFile(filepath.Join(dir, "001_initial.up.sql"), generator.GenerateMigrationUp(cfg.Models, cfg.Database.Driver)); err != nil {
-					return err
-				}
-				return writeFile(filepath.Join(dir, "001_initial.down.sql"), generator.GenerateMigrationDown(cfg.Models))
+				return writeFile(filepath.Join(dir, "001_initial.up.sql"), generator.GenerateMigrationUp(cfg.Models, cfg.Database.Driver))
 			}},
 			{"Generating models", func() error {
 				dir := filepath.Join(out, "models")

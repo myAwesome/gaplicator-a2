@@ -1,0 +1,13 @@
+{{range $i, $m := .Models}}{{if $i}}
+{{end}}CREATE TABLE IF NOT EXISTS {{$m.Name}} (
+    id SERIAL PRIMARY KEY{{range $m.Fields}},
+    {{.Name}} {{.SQLType}}{{if .Required}} NOT NULL{{end}}{{if .Unique}} UNIQUE{{end}}{{if .HasDefault}} DEFAULT {{.Default}}{{end}}{{if .HasRef}} REFERENCES {{.RefTable}}({{.RefCol}}){{end}}{{end}}
+);
+{{range $m.Indexes}}CREATE INDEX IF NOT EXISTS {{.IndexName}} ON {{.Table}} ({{.Column}});
+{{end}}{{end}}{{range .JoinTables}}
+CREATE TABLE IF NOT EXISTS {{.Table}} (
+    {{.ACol}} INT NOT NULL REFERENCES {{.AName}}(id) ON DELETE CASCADE,
+    {{.BCol}} INT NOT NULL REFERENCES {{.BName}}(id) ON DELETE CASCADE,
+    PRIMARY KEY ({{.ACol}}, {{.BCol}})
+);
+{{end}}

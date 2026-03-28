@@ -14,6 +14,12 @@ import (
 //go:embed templates/main.go.tmpl
 var mainTmpl string
 
+//go:embed templates/migration_postgres.sql.tmpl
+var migrationPostgresTmpl string
+
+//go:embed templates/migration_mysql.sql.tmpl
+var migrationMySQLTmpl string
+
 //go:embed templates/docker-compose.yml.tmpl
 var dockerComposeTmpl string
 
@@ -323,70 +329,81 @@ func ValidateConfig(cfg *Config) []error {
 	return errs
 }
 
-func GenerateMigrationUp(models []Model, driver string) string {
+type migrationField struct {
+	Name       string
+	SQLType    string
+	Required   bool
+	Unique     bool
+	HasDefault bool
+	Default    string
+	HasRef     bool
+	RefTable   string
+	RefCol     string
+}
+
+type migrationIndex struct {
+	IndexName string
+	Table     string
+	Column    string
+}
+
+type migrationModel struct {
+	Name    string
+	Fields  []migrationField
+	Indexes []migrationIndex
+}
+
+type migrationData struct {
+	Models     []migrationModel
+	JoinTables []joinTableDef
+}
+
+func buildMigrationData(models []Model, driver string) migrationData {
 	sorted := topoSort(models)
-	var sb strings.Builder
+	tableModels := make([]migrationModel, len(sorted))
 	for i, m := range sorted {
-		if i > 0 {
-			sb.WriteString("\n")
+		fields := make([]migrationField, len(m.Fields))
+		var indexes []migrationIndex
+		for j, f := range m.Fields {
+			mf := migrationField{
+				Name:     f.Name,
+				SQLType:  fieldSQLType(f, driver),
+				Required: f.Required,
+				Unique:   f.Unique,
+			}
+			if f.Default != nil {
+				mf.HasDefault = true
+				mf.Default = formatDefault(f.Default)
+			}
+			if f.References != "" {
+				parts := strings.SplitN(f.References, ".", 2)
+				mf.HasRef = true
+				mf.RefTable = parts[0]
+				mf.RefCol = parts[1]
+			}
+			fields[j] = mf
+			if f.Index && !f.Unique {
+				indexes = append(indexes, migrationIndex{
+					IndexName: fmt.Sprintf("idx_%s_%s", m.Name, f.Name),
+					Table:     m.Name,
+					Column:    f.Name,
+				})
+			}
 		}
-		sb.WriteString(tableSQL(m, driver))
+		tableModels[i] = migrationModel{Name: m.Name, Fields: fields, Indexes: indexes}
 	}
-	joins := collectJoinTables(models)
-	for _, j := range joins {
-		sb.WriteString("\n")
-		sb.WriteString(joinTableSQL(j, driver))
-	}
-	return sb.String()
+	return migrationData{Models: tableModels, JoinTables: collectJoinTables(models)}
 }
 
-func GenerateMigrationDown(models []Model) string {
-	sorted := topoSort(models)
-	var sb strings.Builder
-	// Drop join tables first (they reference the main tables).
-	joins := collectJoinTables(models)
-	for i := len(joins) - 1; i >= 0; i-- {
-		fmt.Fprintf(&sb, "DROP TABLE IF EXISTS %s;\n", joins[i].Table)
+func GenerateMigrationUp(models []Model, driver string) string {
+	data := buildMigrationData(models, driver)
+	tmplSrc := migrationPostgresTmpl
+	if driver == "mysql" {
+		tmplSrc = migrationMySQLTmpl
 	}
-	for i := len(sorted) - 1; i >= 0; i-- {
-		fmt.Fprintf(&sb, "DROP TABLE IF EXISTS %s;\n", sorted[i].Name)
-	}
-	return sb.String()
-}
-
-func tableSQL(m Model, driver string) string {
-	isMySQL := driver == "mysql"
-	var sb strings.Builder
-	fmt.Fprintf(&sb, "CREATE TABLE IF NOT EXISTS %s (\n", m.Name)
-	if isMySQL {
-		sb.WriteString("    id INT AUTO_INCREMENT PRIMARY KEY")
-	} else {
-		sb.WriteString("    id SERIAL PRIMARY KEY")
-	}
-	for _, f := range m.Fields {
-		sb.WriteString(",\n")
-		fmt.Fprintf(&sb, "    %s %s", f.Name, fieldSQLType(f, driver))
-		if f.Required {
-			sb.WriteString(" NOT NULL")
-		}
-		if f.Unique {
-			sb.WriteString(" UNIQUE")
-		}
-		if f.Default != nil {
-			fmt.Fprintf(&sb, " DEFAULT %s", formatDefault(f.Default))
-		}
-		if f.References != "" {
-			parts := strings.SplitN(f.References, ".", 2)
-			fmt.Fprintf(&sb, " REFERENCES %s(%s)", parts[0], parts[1])
-		}
-	}
-	sb.WriteString("\n);\n")
-	for _, f := range m.Fields {
-		if f.Index && !f.Unique {
-			fmt.Fprintf(&sb, "CREATE INDEX IF NOT EXISTS idx_%s_%s ON %s (%s);\n", m.Name, f.Name, m.Name, f.Name)
-		}
-	}
-	return sb.String()
+	var buf strings.Builder
+	template.Must(template.New("migration").Parse(tmplSrc)).Execute(&buf, data) //nolint:errcheck
+	return buf.String()
 }
 
 func fieldSQLType(f Field, driver string) string {
@@ -500,26 +517,6 @@ func collectJoinTables(models []Model) []joinTableDef {
 	return result
 }
 
-func joinTableSQL(j joinTableDef, driver string) string {
-	if driver == "mysql" {
-		return fmt.Sprintf(
-			"CREATE TABLE IF NOT EXISTS %s (\n    %s INT NOT NULL,\n    %s INT NOT NULL,\n    PRIMARY KEY (%s, %s),\n    FOREIGN KEY (%s) REFERENCES %s(id) ON DELETE CASCADE,\n    FOREIGN KEY (%s) REFERENCES %s(id) ON DELETE CASCADE\n);\n",
-			j.Table,
-			j.ACol,
-			j.BCol,
-			j.ACol, j.BCol,
-			j.ACol, j.AName,
-			j.BCol, j.BName,
-		)
-	}
-	return fmt.Sprintf(
-		"CREATE TABLE IF NOT EXISTS %s (\n    %s INT NOT NULL REFERENCES %s(id) ON DELETE CASCADE,\n    %s INT NOT NULL REFERENCES %s(id) ON DELETE CASCADE,\n    PRIMARY KEY (%s, %s)\n);\n",
-		j.Table,
-		j.ACol, j.AName,
-		j.BCol, j.BName,
-		j.ACol, j.BCol,
-	)
-}
 
 func toSingular(s string) string {
 	if strings.HasSuffix(s, "ies") {
@@ -705,29 +702,20 @@ func GenerateGORMModels(models []Model, pkgName string, auth *AuthConfig) string
 }
 
 func GenerateMain(cfg *Config, appImport string) (string, error) {
-	models := make([]string, len(cfg.Models))
-	for i, m := range cfg.Models {
-		models[i] = toPascalCase(toSingular(m.Name))
-	}
-
 	data := struct {
-		ModelsImport string
 		RoutesImport string
 		DBHost       string
 		DBName       string
 		DBPort       int
 		Port         int
-		Models       []string
 		HasAuth      bool
 		IsMySQL      bool
 	}{
-		ModelsImport: fmt.Sprintf("%q", appImport+"/models"),
 		RoutesImport: fmt.Sprintf("%q", appImport+"/routes"),
 		DBHost:       fmt.Sprintf("%q", cfg.Database.Host),
 		DBName:       fmt.Sprintf("%q", cfg.Database.Name),
 		DBPort:       cfg.Database.Port,
 		Port:         cfg.App.Port,
-		Models:       models,
 		HasAuth:      cfg.Auth != nil,
 		IsMySQL:      cfg.Database.Driver == "mysql",
 	}
