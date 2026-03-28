@@ -1,6 +1,9 @@
 {{range $i, $m := .Models}}{{if $i}}
 {{end}}CREATE TABLE IF NOT EXISTS {{$m.Name}} (
-    id INT AUTO_INCREMENT PRIMARY KEY{{range $m.Fields}},
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    created_at DATETIME,
+    updated_at DATETIME,
+    deleted_at DATETIME{{range $m.Fields}},
     {{.Name}} {{.SQLType}}{{if .Required}} NOT NULL{{end}}{{if .Unique}} UNIQUE{{end}}{{if .HasDefault}} DEFAULT {{.Default}}{{end}}{{end}}{{range $m.Fields}}{{if .HasRef}},
     FOREIGN KEY ({{.Name}}) REFERENCES {{.RefTable}}({{.RefCol}}){{end}}{{end}}
 );

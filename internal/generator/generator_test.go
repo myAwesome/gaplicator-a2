@@ -1607,6 +1607,86 @@ func TestValidateConfig_M2M_SelfReference(t *testing.T) {
 	}
 }
 
+// ── Migration MySQL ────────────────────────────────────────────────────────────
+
+func TestGenerateMigrationUp_MySQL_BaseColumns(t *testing.T) {
+	models := []Model{
+		{Name: "users", Fields: []Field{{Name: "email", Type: "varchar(255)", Required: true}}},
+	}
+	out := GenerateMigrationUp(models, "mysql")
+	for _, col := range []string{"created_at DATETIME", "updated_at DATETIME", "deleted_at DATETIME"} {
+		if !strings.Contains(out, col) {
+			t.Errorf("expected %q in MySQL migration:\n%s", col, out)
+		}
+	}
+}
+
+func TestGenerateMigrationUp_MySQL_AutoIncrement(t *testing.T) {
+	models := []Model{
+		{Name: "items", Fields: []Field{{Name: "name", Type: "text"}}},
+	}
+	out := GenerateMigrationUp(models, "mysql")
+	if !strings.Contains(out, "id INT AUTO_INCREMENT PRIMARY KEY") {
+		t.Errorf("expected AUTO_INCREMENT primary key in MySQL migration:\n%s", out)
+	}
+}
+
+func TestGenerateMigrationUp_MySQL_ForeignKey(t *testing.T) {
+	models := []Model{
+		{Name: "users", Fields: []Field{{Name: "email", Type: "varchar(255)"}}},
+		{Name: "posts", Fields: []Field{
+			{Name: "title", Type: "varchar(255)"},
+			{Name: "user_id", Type: "int", References: "users.id"},
+		}},
+	}
+	out := GenerateMigrationUp(models, "mysql")
+	if !strings.Contains(out, "FOREIGN KEY (user_id) REFERENCES users(id)") {
+		t.Errorf("expected explicit FOREIGN KEY constraint in MySQL migration:\n%s", out)
+	}
+}
+
+func TestGenerateMigrationUp_MySQL_Enum(t *testing.T) {
+	models := []Model{
+		{Name: "posts", Fields: []Field{
+			{Name: "status", Type: "enum", Values: []string{"draft", "published"}, Required: true},
+		}},
+	}
+	out := GenerateMigrationUp(models, "mysql")
+	if !strings.Contains(out, "ENUM('draft', 'published')") {
+		t.Errorf("expected ENUM type in MySQL migration:\n%s", out)
+	}
+	if strings.Contains(out, "TEXT CHECK") {
+		t.Error("MySQL should not use TEXT CHECK for enum")
+	}
+}
+
+func TestGenerateMigrationUp_MySQL_JoinTable(t *testing.T) {
+	out := GenerateMigrationUp(m2mTestModels, "mysql")
+	if !strings.Contains(out, "CREATE TABLE IF NOT EXISTS courses_students") {
+		t.Errorf("expected join table in MySQL migration:\n%s", out)
+	}
+	if !strings.Contains(out, "FOREIGN KEY (course_id) REFERENCES courses(id) ON DELETE CASCADE") {
+		t.Errorf("expected course_id FK in MySQL join table:\n%s", out)
+	}
+	if !strings.Contains(out, "FOREIGN KEY (student_id) REFERENCES students(id) ON DELETE CASCADE") {
+		t.Errorf("expected student_id FK in MySQL join table:\n%s", out)
+	}
+}
+
+func TestGenerateMigrationUp_MySQL_NoInlineReferences(t *testing.T) {
+	models := []Model{
+		{Name: "users", Fields: []Field{{Name: "email", Type: "varchar(255)"}}},
+		{Name: "posts", Fields: []Field{
+			{Name: "user_id", Type: "int", References: "users.id"},
+		}},
+	}
+	out := GenerateMigrationUp(models, "mysql")
+	// MySQL silently ignores inline REFERENCES — must use explicit FOREIGN KEY
+	if strings.Contains(out, "user_id INT REFERENCES") {
+		t.Error("MySQL migration must not use inline REFERENCES syntax")
+	}
+}
+
 // ── Migration M2M ─────────────────────────────────────────────────────────────
 
 func TestGenerateMigrationUp_JoinTable(t *testing.T) {
