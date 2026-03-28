@@ -29,6 +29,7 @@
 
 html, body {
   height: 100%;
+  overflow: hidden;
   background: var(--bg);
   color: var(--text);
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', sans-serif;
@@ -39,6 +40,7 @@ html, body {
 
 #root {
   height: 100%;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
 }
@@ -106,6 +108,7 @@ html, body {
 .preview-panel {
   width: 400px;
   flex-shrink: 0;
+  min-height: 0;
   border-left: 1px solid var(--border);
   display: flex;
   flex-direction: column;
