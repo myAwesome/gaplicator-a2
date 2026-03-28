@@ -23,14 +23,14 @@ services:
     environment:
       MYSQL_ROOT_PASSWORD: {{.DBPassword}}
       MYSQL_DATABASE: {{.DBName}}
-      MYSQL_USER: {{.DBUser}}
+{{if ne .DBUser "root"}}      MYSQL_USER: {{.DBUser}}
       MYSQL_PASSWORD: {{.DBPassword}}
-    ports:
+{{end}}    ports:
       - "{{.DBPort}}:3306"
     volumes:
       - mysql_data:/var/lib/mysql
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "{{.DBUser}}", "--password={{.DBPassword}}"]
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p$$MYSQL_ROOT_PASSWORD"]
       interval: 5s
       timeout: 5s
       retries: 5
