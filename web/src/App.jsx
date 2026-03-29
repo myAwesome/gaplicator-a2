@@ -1,10 +1,11 @@
-import { useState, useCallback, useId } from 'react'
+import { useState, useCallback, useEffect, useId } from 'react'
 import { generateYaml, generateYamlHighlighted } from './yamlGenerator.js'
 import AppSection from './components/AppSection.jsx'
 import DatabaseSection from './components/DatabaseSection.jsx'
 import AuthSection from './components/AuthSection.jsx'
 import ModelsSection from './components/ModelsSection.jsx'
 import YamlPreview from './components/YamlPreview.jsx'
+import ThemeToggle from './components/ThemeToggle.jsx'
 
 let _id = 0
 export function uid() { return ++_id }
@@ -39,8 +40,22 @@ const INITIAL = {
 
 export { DEFAULT_FIELD, DEFAULT_MODEL }
 
+const STORAGE_KEY = 'gaplicator_config'
+
+function loadConfig() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY)
+    if (raw) return JSON.parse(raw)
+  } catch (_) {}
+  return null
+}
+
 export default function App() {
-  const [config, setConfig] = useState(INITIAL)
+  const [config, setConfig] = useState(() => loadConfig() || INITIAL)
+
+  useEffect(() => {
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(config)) } catch (_) {}
+  }, [config])
 
   const setApp = useCallback(patch =>
     setConfig(c => ({ ...c, app: { ...c.app, ...patch } })), [])
@@ -66,6 +81,7 @@ export default function App() {
         </div>
         <div className="app-header-sep" />
         <div className="app-header-sub">Schema Generator</div>
+        <ThemeToggle />
       </header>
 
       <div className="app-body">
