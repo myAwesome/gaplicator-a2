@@ -764,19 +764,11 @@ func GenerateMain(cfg *Config, appImport string) (string, error) {
 
 func GenerateDockerCompose(cfg *Config) (string, error) {
 	data := struct {
-		Port       int
-		DBPort     int
-		DBName     string
-		DBUser     string
-		DBPassword string
-		IsMySQL    bool
+		DBUser  string
+		IsMySQL bool
 	}{
-		Port:       cfg.App.Port,
-		DBPort:     cfg.Database.Port,
-		DBName:     cfg.Database.Name,
-		DBUser:     cfg.Database.User,
-		DBPassword: cfg.Database.Password,
-		IsMySQL:    cfg.Database.Driver == "mysql",
+		DBUser:  cfg.Database.User,
+		IsMySQL: cfg.Database.Driver == "mysql",
 	}
 	var buf strings.Builder
 	if err := template.Must(template.New("docker-compose").Parse(dockerComposeTmpl)).Execute(&buf, data); err != nil {

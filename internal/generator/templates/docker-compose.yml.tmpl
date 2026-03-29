@@ -2,16 +2,17 @@ services:
   app:
     build: .
     ports:
-      - "{{.Port}}:{{.Port}}"
+      - "${APP_PORT}:${APP_PORT}"
     environment:
 {{if .IsMySQL}}      DB_HOST: mysql
       DB_PORT: 3306
 {{else}}      DB_HOST: postgres
       DB_PORT: 5432
       DB_SSLMODE: disable
-{{end}}      DB_NAME: {{.DBName}}
-      DB_USER: {{.DBUser}}
-      DB_PASSWORD: {{.DBPassword}}
+{{end}}      DB_NAME: ${DB_NAME}
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+      APP_PORT: ${APP_PORT}
     depends_on:
 {{if .IsMySQL}}      mysql:
 {{else}}      postgres:
@@ -21,12 +22,12 @@ services:
 {{if .IsMySQL}}  mysql:
     image: mysql:8
     environment:
-      MYSQL_ROOT_PASSWORD: {{.DBPassword}}
-      MYSQL_DATABASE: {{.DBName}}
-{{if ne .DBUser "root"}}      MYSQL_USER: {{.DBUser}}
-      MYSQL_PASSWORD: {{.DBPassword}}
+      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD}
+      MYSQL_DATABASE: ${DB_NAME}
+{{if ne .DBUser "root"}}      MYSQL_USER: ${DB_USER}
+      MYSQL_PASSWORD: ${DB_PASSWORD}
 {{end}}    ports:
-      - "{{.DBPort}}:3306"
+      - "${DB_PORT}:3306"
     volumes:
       - mysql_data:/var/lib/mysql
     healthcheck:
@@ -38,15 +39,15 @@ services:
 {{else}}  postgres:
     image: postgres:16-alpine
     environment:
-      POSTGRES_USER: {{.DBUser}}
-      POSTGRES_PASSWORD: {{.DBPassword}}
-      POSTGRES_DB: {{.DBName}}
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME}
     ports:
-      - "{{.DBPort}}:5432"
+      - "${DB_PORT}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U {{.DBUser}} -d {{.DBName}}"]
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
       interval: 5s
       timeout: 5s
       retries: 5

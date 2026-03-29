@@ -300,9 +300,9 @@ func TestGenerateDockerCompose_Services(t *testing.T) {
 		"app:",
 		"postgres:",
 		"image: postgres:16-alpine",
-		`"8080:8080"`,
+		`"${APP_PORT}:${APP_PORT}"`,
 		"DB_HOST: postgres",
-		"POSTGRES_DB: mydb",
+		"POSTGRES_DB: ${DB_NAME}",
 		"postgres_data:",
 		"service_healthy",
 	} {
@@ -323,11 +323,11 @@ func TestGenerateDockerCompose_PortAndDBName(t *testing.T) {
 		t.Fatalf("GenerateDockerCompose: %v", err)
 	}
 
-	if !strings.Contains(out, `"3000:3000"`) {
-		t.Error("expected port 3000 in app service")
+	if !strings.Contains(out, `"${APP_PORT}:${APP_PORT}"`) {
+		t.Error("expected APP_PORT env var reference in app service ports")
 	}
-	if !strings.Contains(out, "POSTGRES_DB: attendance_db") {
-		t.Error("expected POSTGRES_DB: attendance_db")
+	if !strings.Contains(out, "POSTGRES_DB: ${DB_NAME}") {
+		t.Error("expected POSTGRES_DB to reference env var")
 	}
 	if !strings.Contains(out, "pg_isready") {
 		t.Error("expected pg_isready healthcheck")
