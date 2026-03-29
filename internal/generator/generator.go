@@ -747,18 +747,10 @@ func GenerateGORMModels(models []Model, pkgName string, auth *AuthConfig) string
 func GenerateMain(cfg *Config, appImport string) (string, error) {
 	data := struct {
 		RoutesImport string
-		DBHost       string
-		DBName       string
-		DBPort       int
-		Port         int
 		HasAuth      bool
 		IsMySQL      bool
 	}{
 		RoutesImport: fmt.Sprintf("%q", appImport+"/routes"),
-		DBHost:       fmt.Sprintf("%q", cfg.Database.Host),
-		DBName:       fmt.Sprintf("%q", cfg.Database.Name),
-		DBPort:       cfg.Database.Port,
-		Port:         cfg.App.Port,
 		HasAuth:      cfg.Auth != nil,
 		IsMySQL:      cfg.Database.Driver == "mysql",
 	}
@@ -808,6 +800,7 @@ func GenerateGoMod(cfg *Config) (string, error) {
 
 func GenerateEnv(cfg *Config) (string, error) {
 	data := struct {
+		AppPort    int
 		DBHost     string
 		DBPort     int
 		DBUser     string
@@ -816,6 +809,7 @@ func GenerateEnv(cfg *Config) (string, error) {
 		HasAuth    bool
 		IsMySQL    bool
 	}{
+		AppPort:    cfg.App.Port,
 		DBHost:     cfg.Database.Host,
 		DBPort:     cfg.Database.Port,
 		DBUser:     cfg.Database.User,
@@ -833,19 +827,13 @@ func GenerateEnv(cfg *Config) (string, error) {
 
 func GenerateDevScript(cfg *Config) (string, error) {
 	data := struct {
-		DBUser     string
-		DBPassword string
-		DBName     string
-		DBPort     int
-		Port       int
-		IsMySQL    bool
+		DBPort  int
+		Port    int
+		IsMySQL bool
 	}{
-		DBUser:     cfg.Database.User,
-		DBPassword: cfg.Database.Password,
-		DBName:     cfg.Database.Name,
-		DBPort:     cfg.Database.Port,
-		Port:       cfg.App.Port,
-		IsMySQL:    cfg.Database.Driver == "mysql",
+		DBPort:  cfg.Database.Port,
+		Port:    cfg.App.Port,
+		IsMySQL: cfg.Database.Driver == "mysql",
 	}
 	var buf strings.Builder
 	if err := template.Must(template.New("dev.sh").Parse(devShTmpl)).Execute(&buf, data); err != nil {

@@ -232,8 +232,8 @@ func TestGenerateMain_DBConnection(t *testing.T) {
 	}
 
 	for _, want := range []string{
-		`"db.example.com"`,
-		`"prod_db"`,
+		`os.Getenv("DB_HOST")`,
+		`os.Getenv("DB_NAME")`,
 		`os.Getenv("DB_USER")`,
 		`os.Getenv("DB_PASSWORD")`,
 		`os.Getenv("DB_PORT")`,
@@ -256,8 +256,8 @@ func TestGenerateMain_DBPortDefault(t *testing.T) {
 		t.Fatalf("GenerateMain: %v", err)
 	}
 
-	if !strings.Contains(out, `dbPort = "5432"`) {
-		t.Error("expected default DB_PORT fallback to 5432")
+	if !strings.Contains(out, `os.Getenv("DB_PORT")`) {
+		t.Error("expected DB_PORT to be read from environment")
 	}
 }
 
@@ -276,7 +276,7 @@ func TestGenerateMain_RouterAndServer(t *testing.T) {
 	for _, want := range []string{
 		"gin.Default()",
 		"routes.RegisterRoutes(r, db)",
-		`r.Run(":3000")`,
+		`os.Getenv("APP_PORT")`,
 	} {
 		if !strings.Contains(out, want) {
 			t.Errorf("missing: %s", want)
@@ -798,8 +798,8 @@ func TestGenerateDevScript_StartsDatabase(t *testing.T) {
 	for _, want := range []string{
 		"docker compose up -d postgres",
 		"pg_isready",
-		"dbuser",
-		"mydb",
+		"$DB_USER",
+		"$DB_NAME",
 	} {
 		if !strings.Contains(out, want) {
 			t.Errorf("missing %q in dev.sh output", want)

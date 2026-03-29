@@ -16,20 +16,8 @@ import (
 
 func main() {
 	dbHost := os.Getenv("DB_HOST")
-	if dbHost == "" {
-		dbHost = {{.DBHost}}
-	}
-
 	dbName := os.Getenv("DB_NAME")
-	if dbName == "" {
-		dbName = {{.DBName}}
-	}
-
 	dbPort := os.Getenv("DB_PORT")
-	if dbPort == "" {
-{{if .IsMySQL}}		dbPort = "3306"
-{{else}}		dbPort = "5432"
-{{end}}	}
 
 {{if .IsMySQL}}	dsn := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?charset=utf8mb4&parseTime=True&loc=Local",
 		os.Getenv("DB_USER"), os.Getenv("DB_PASSWORD"), dbHost, dbPort, dbName,
@@ -70,7 +58,7 @@ func main() {
 	authenticated.Use(JWTMiddleware())
 	routes.RegisterRoutes(authenticated, db)
 {{else}}	routes.RegisterRoutes(r, db)
-{{end}}	if err := r.Run(":{{.Port}}"); err != nil {
+{{end}}	if err := r.Run(":" + os.Getenv("APP_PORT")); err != nil {
 		log.Fatalf("server: %v", err)
 	}
 }

@@ -8,10 +8,6 @@ if [ -f .env ]; then
   set -a && source .env && set +a
 fi
 
-DB_USER="${DB_USER:-{{.DBUser}}}"
-DB_PASSWORD="${DB_PASSWORD:-{{.DBPassword}}}"
-DB_NAME="${DB_NAME:-{{.DBName}}}"
-
 # ── 1. Database ────────────────────────────────────────────────────────────────
 echo "▸ Starting database..."
 {{if .IsMySQL}}docker compose up -d mysql
