@@ -1,0 +1,78 @@
+# {{.AppName}}
+
+Generated full-stack web application.
+
+## Stack
+
+| Layer    | Technology                      |
+|----------|---------------------------------|
+| Database | {{if .IsMySQL}}MySQL{{else}}PostgreSQL{{end}}              |
+| Server   | Go + Gin + GORM                 |
+| Client   | React + TypeScript + Vite       |
+
+## Getting started
+
+```bash
+# Start the database, apply migrations, and run the server
+./dev.sh
+
+# Stop all containers
+./shutdown.sh
+```
+
+The server listens on port **{{.Port}}**.
+The React dev server proxies API calls to the backend automatically.
+
+```bash
+# Start the frontend dev server (in a separate terminal)
+cd client && npm install && npm run dev
+```
+
+## Environment variables
+
+Configured in `.env`:
+
+| Variable      | Description                        |
+|---------------|------------------------------------|
+| `DB_HOST`     | Database host                      |
+| `DB_PORT`     | Database port                      |
+| `DB_USER`     | Database user                      |
+| `DB_PASSWORD` | Database password                  |
+| `DB_NAME`     | Database name                      |
+{{if .IsMySQL}}{{else}}| `DB_SSLMODE`  | SSL mode (default: `disable`)      |
+{{end}}{{if .HasAuth}}| `JWT_SECRET`  | Secret key for signing JWT tokens  |
+{{end}}
+## API
+{{if .HasAuth}}
+### Authentication
+
+| Method | Path              | Description                                      |
+|--------|-------------------|--------------------------------------------------|
+| `POST` | `/auth/register`  | Register — body: `{"{{.IdentityField}}": "...", "password": "..."}` |
+| `POST` | `/auth/login`     | Login — returns `{"token": "<jwt>"}` |
+
+All model routes require `Authorization: Bearer <token>`.
+{{end}}
+### Models
+{{range .Models}}
+#### `{{.Name}}`
+
+| Method   | Path                    | Description                                 |
+|----------|-------------------------|---------------------------------------------|
+| `GET`    | `/{{.Name}}`            | List (pagination, search, filter, sort)     |
+| `GET`    | `/{{.Name}}/:id`        | Get by id                                   |
+| `POST`   | `/{{.Name}}`            | Create                                      |
+| `PUT`    | `/{{.Name}}/:id`        | Update                                      |
+| `DELETE` | `/{{.Name}}/:id`        | Delete                                      |
+| `DELETE` | `/{{.Name}}/batch`      | Batch delete — body: `{"ids": [1, 2, 3]}`   |
+{{end}}
+### Query parameters (list endpoints)
+
+| Parameter     | Description                                                        |
+|---------------|--------------------------------------------------------------------|
+| `q`           | Full-text search across all text fields (case-insensitive)         |
+| `<field>`     | Filter by exact value (numeric, boolean, enum, or foreign key)     |
+| `sort_by`     | Field to sort by. Default: `id`                                    |
+| `sort_dir`    | `asc` or `desc`. Default: `desc`                                   |
+| `page`        | Page number (1-based). Default: `1`                                |
+| `limit`       | Results per page. Default: `20`, max: `100`                        |

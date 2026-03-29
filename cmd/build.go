@@ -110,6 +110,13 @@ var buildCmd = &cobra.Command{
 				}
 				return writeExecutable(filepath.Join(out, "shutdown.sh"), content)
 			}},
+			{"Generating README.md", func() error {
+				content, err := generator.GenerateReadme(cfg)
+				if err != nil {
+					return err
+				}
+				return writeFile(filepath.Join(out, "README.md"), content)
+			}},
 			{"Generating client", func() error {
 				clientDir := filepath.Join(out, "client")
 				srcDir := filepath.Join(clientDir, "src")

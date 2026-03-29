@@ -44,6 +44,9 @@ var ginRoutesTmpl string
 //go:embed templates/auth.go.tmpl
 var authGoTmpl string
 
+//go:embed templates/readme.md.tmpl
+var readmeTmpl string
+
 type AuthConfig struct {
 	Model string `yaml:"model"`
 }
@@ -855,6 +858,38 @@ func GenerateShutdownScript() (string, error) {
 	var buf strings.Builder
 	if err := template.Must(template.New("shutdown.sh").Parse(shutdownShTmpl)).Execute(&buf, nil); err != nil {
 		return "", fmt.Errorf("execute shutdown.sh template: %w", err)
+	}
+	return buf.String(), nil
+}
+
+func GenerateReadme(cfg *Config) (string, error) {
+	identityField := "email"
+	if cfg.Auth != nil {
+		for _, m := range cfg.Models {
+			if m.Name == cfg.Auth.Model {
+				identityField = detectIdentityField(m)
+				break
+			}
+		}
+	}
+	data := struct {
+		AppName       string
+		Port          int
+		IsMySQL       bool
+		HasAuth       bool
+		IdentityField string
+		Models        []Model
+	}{
+		AppName:       cfg.App.Name,
+		Port:          cfg.App.Port,
+		IsMySQL:       cfg.Database.Driver == "mysql",
+		HasAuth:       cfg.Auth != nil,
+		IdentityField: identityField,
+		Models:        cfg.Models,
+	}
+	var buf strings.Builder
+	if err := template.Must(template.New("readme.md").Parse(readmeTmpl)).Execute(&buf, data); err != nil {
+		return "", fmt.Errorf("execute readme.md template: %w", err)
 	}
 	return buf.String(), nil
 }
