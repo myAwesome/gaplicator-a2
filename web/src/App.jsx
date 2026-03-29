@@ -1,16 +1,21 @@
-import { useState, useCallback, useEffect, useId } from 'react'
-import { generateYaml, generateYamlHighlighted } from './yamlGenerator.js'
+import { useState, useCallback, useEffect } from 'react'
+import {
+  generateYaml, generateYamlHighlighted,
+  generateSimpleYaml, generateSimpleYamlHighlighted,
+} from './yamlGenerator.js'
 import AppSection from './components/AppSection.jsx'
 import DatabaseSection from './components/DatabaseSection.jsx'
 import AuthSection from './components/AuthSection.jsx'
 import ModelsSection from './components/ModelsSection.jsx'
 import YamlPreview from './components/YamlPreview.jsx'
 import ThemeToggle from './components/ThemeToggle.jsx'
+import ProjectsView from './components/ProjectsView.jsx'
+import { loadProjects, saveProjects, createProject } from './projectStorage.js'
 
 let _id = 0
 export function uid() { return ++_id }
 
-const DEFAULT_FIELD = () => ({
+export const DEFAULT_FIELD = () => ({
   _id: uid(),
   name: '',
   type: 'varchar(255)',
@@ -24,63 +29,109 @@ const DEFAULT_FIELD = () => ({
   values: [],
 })
 
-const DEFAULT_MODEL = () => ({
+export const DEFAULT_MODEL = () => ({
   _id: uid(),
   name: '',
   many_to_many: [],
   fields: [DEFAULT_FIELD()],
 })
 
-const INITIAL = {
-  app: { name: 'my-app', port: 8080 },
-  database: { driver: 'postgres', host: 'localhost', port: 5432, name: 'my_db', user: 'postgres', password: 'secret' },
-  auth: { enabled: false, model: '' },
-  models: [],
-}
-
-export { DEFAULT_FIELD, DEFAULT_MODEL }
-
-const STORAGE_KEY = 'gaplicator_config'
-
-function loadConfig() {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY)
-    if (raw) return JSON.parse(raw)
-  } catch (_) {}
-  return null
-}
-
 export default function App() {
-  const [config, setConfig] = useState(() => loadConfig() || INITIAL)
+  const [projects, setProjects] = useState(loadProjects)
+  const [activeProjectId, setActiveProjectId] = useState(null)
 
+  // Persist projects whenever they change
   useEffect(() => {
-    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(config)) } catch (_) {}
-  }, [config])
+    saveProjects(projects)
+  }, [projects])
+
+  const activeProject = projects.find(p => p.id === activeProjectId) ?? null
+
+  // ── Project management ──────────────────────────────────────────────────────
+
+  const handleCreate = useCallback((name, type) => {
+    const project = createProject(name, type)
+    setProjects(ps => [...ps, project])
+    setActiveProjectId(project.id)
+  }, [])
+
+  const handleOpen = useCallback((id) => {
+    setActiveProjectId(id)
+  }, [])
+
+  const handleDelete = useCallback((id) => {
+    setProjects(ps => ps.filter(p => p.id !== id))
+    if (activeProjectId === id) setActiveProjectId(null)
+  }, [activeProjectId])
+
+  const handleBack = useCallback(() => {
+    setActiveProjectId(null)
+  }, [])
+
+  // ── Config updater for active project ───────────────────────────────────────
+
+  const updateConfig = useCallback((updater) => {
+    setProjects(ps => ps.map(p => {
+      if (p.id !== activeProjectId) return p
+      const newConfig = typeof updater === 'function' ? updater(p.config) : updater
+      return { ...p, config: newConfig, updatedAt: new Date().toISOString() }
+    }))
+  }, [activeProjectId])
 
   const setApp = useCallback(patch =>
-    setConfig(c => ({ ...c, app: { ...c.app, ...patch } })), [])
+    updateConfig(c => ({ ...c, app: { ...c.app, ...patch } })), [updateConfig])
 
   const setDatabase = useCallback(patch =>
-    setConfig(c => ({ ...c, database: { ...c.database, ...patch } })), [])
+    updateConfig(c => ({ ...c, database: { ...c.database, ...patch } })), [updateConfig])
 
   const setAuth = useCallback(patch =>
-    setConfig(c => ({ ...c, auth: { ...c.auth, ...patch } })), [])
+    updateConfig(c => ({ ...c, auth: { ...c.auth, ...patch } })), [updateConfig])
 
   const setModels = useCallback(updater =>
-    setConfig(c => ({ ...c, models: typeof updater === 'function' ? updater(c.models) : updater })), [])
+    updateConfig(c => ({ ...c, models: typeof updater === 'function' ? updater(c.models) : updater })),
+    [updateConfig])
 
-  const yaml = generateYaml(config)
-  const highlighted = generateYamlHighlighted(config)
+  // ── Projects view ───────────────────────────────────────────────────────────
+
+  if (!activeProject) {
+    return (
+      <ProjectsView
+        projects={projects}
+        onOpen={handleOpen}
+        onCreate={handleCreate}
+        onDelete={handleDelete}
+      />
+    )
+  }
+
+  // ── Editor view ─────────────────────────────────────────────────────────────
+
+  const config = activeProject.config
+  const schemaType = activeProject.type
+
+  const fullYaml = generateYaml(config)
+  const fullHighlighted = generateYamlHighlighted(config)
+  const simpleYaml = generateSimpleYaml(config)
+  const simpleHighlighted = generateSimpleYamlHighlighted(config)
+
   const modelNames = config.models.map(m => m.name).filter(Boolean)
 
   return (
     <div className="app-layout">
       <header className="app-header">
+        <button className="btn-back" onClick={handleBack} title="Back to projects">
+          ←
+        </button>
         <div className="app-header-logo">
           Gaplic<span>ator</span>
         </div>
         <div className="app-header-sep" />
-        <div className="app-header-sub">Schema Generator</div>
+        <div className="app-header-project">
+          <span className="app-header-project-name">{activeProject.name}</span>
+          <span className={`project-type-badge ${schemaType}`}>
+            {schemaType === 'simple' ? 'Simple' : 'Full'}
+          </span>
+        </div>
         <ThemeToggle />
       </header>
 
@@ -96,7 +147,13 @@ export default function App() {
           />
         </div>
 
-        <YamlPreview yaml={yaml} highlighted={highlighted} />
+        <YamlPreview
+          fullYaml={fullYaml}
+          fullHighlighted={fullHighlighted}
+          simpleYaml={simpleYaml}
+          simpleHighlighted={simpleHighlighted}
+          defaultTab={schemaType}
+        />
       </div>
     </div>
   )

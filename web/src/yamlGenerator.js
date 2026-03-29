@@ -173,3 +173,74 @@ export function generateYaml(config) {
 export function generateYamlHighlighted(config) {
   return highlightYaml(generateYaml(config))
 }
+
+// ── Simple schema generation ─────────────────────────────────────────────────
+
+function toSimpleType(field) {
+  // FK reference → rel
+  if (field.references) return 'rel'
+  const t = (field.type || '').toLowerCase()
+  // enum with values → enum("a","b","c")
+  if (t === 'enum' && field.values && field.values.filter(Boolean).length > 0) {
+    const vals = field.values.filter(Boolean).map(v => `"${v}"`).join(',')
+    return `enum(${vals})`
+  }
+  // varchar(N) → string
+  if (t.startsWith('varchar')) return 'string'
+  return t || 'string'
+}
+
+function toSimpleFieldName(field) {
+  // Strip _id suffix from FK fields for cleaner simple schema output
+  if (field.references && field.name.endsWith('_id')) {
+    return field.name.slice(0, -3)
+  }
+  return field.name
+}
+
+export function generateSimpleYaml(config) {
+  const models = config.models.filter(m => m.name)
+  if (models.length === 0) return '# No models defined\n'
+
+  const lines = []
+  lines.push('models:')
+
+  for (const model of models) {
+    lines.push(`    ${model.name}:`)
+    const fields = model.fields.filter(f => f.name && f.type)
+    for (const field of fields) {
+      const fname = toSimpleFieldName(field)
+      const ftype = toSimpleType(field)
+      lines.push(`        ${fname}: ${ftype}`)
+    }
+  }
+
+  // M2M section — deduplicate by sorting pair
+  const seen = new Set()
+  const m2mEntries = []
+
+  for (const model of models) {
+    const m2m = (model.many_to_many || []).filter(Boolean)
+    for (const other of m2m) {
+      const key = [model.name, other].sort().join('|')
+      if (seen.has(key)) continue
+      seen.add(key)
+      m2mEntries.push({ name: `${model.name}_has_${other}`, a: model.name, b: other })
+    }
+  }
+
+  if (m2mEntries.length > 0) {
+    lines.push('m2m:')
+    for (const entry of m2mEntries) {
+      lines.push(`    ${entry.name}:`)
+      lines.push(`        ${entry.a}: rel`)
+      lines.push(`        ${entry.b}: rel`)
+    }
+  }
+
+  return lines.join('\n') + '\n'
+}
+
+export function generateSimpleYamlHighlighted(config) {
+  return highlightYaml(generateSimpleYaml(config))
+}
