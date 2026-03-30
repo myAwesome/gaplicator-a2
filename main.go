@@ -1,6 +1,6 @@
 package main
 
-import "gapp/cmd"
+import "github.com/myAwesome/gaplicator/cmd"
 
 func main() {
 	cmd.Execute()

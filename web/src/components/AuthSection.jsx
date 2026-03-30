@@ -53,7 +53,7 @@ export default function AuthSection({ auth, modelNames, onChange }) {
                 />
               )}
               <span style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 3 }}>
-                If the model is not in the list below, Gaplicator will auto-create it with default fields.
+                If the model is not in the list below, gaplicator will auto-create it with default fields.
               </span>
             </div>
           )}
