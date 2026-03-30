@@ -1,6 +1,6 @@
 # Config Reference
 
-A Gaplicator config file is a YAML document with up to four top-level sections: `app`, `database`, `models`, and the optional `auth`.
+A gaplicator config file is a YAML document with up to four top-level sections: `app`, `database`, `models`, and the optional `auth`.
 
 ```yaml
 app:
@@ -95,7 +95,7 @@ models:
       - name: name
         type: varchar(100)
 
-  # …or omit the model entirely and let Gaplicator create a default one:
+  # …or omit the model entirely and let gaplicator create a default one:
   # auth:
   #   model: users
   # (no users entry in models needed)

@@ -1,19 +1,62 @@
-# Gaplicator
+# gaplicator
 
 Generate a full-stack web application (database + server + client) from a single YAML config file.
 
+## Prerequisites
+
+- **Go 1.21+** — to install and run gaplicator
+- **Docker** — to run the database via the generated `dev.sh`
+- **Node.js 18+** — to run the generated React frontend
+
+## Quick start
+
+```bash
+# install
+go install github.com/myAwesome/gaplicator@latest
+
+# write a config
+cat > app.yaml <<EOF
+app:
+  name: my-app
+  port: 8080
+
+database:
+  host: localhost
+  name: my_db
+
+models:
+  - name: posts
+    fields:
+      - name: title
+        type: varchar(200)
+        required: true
+      - name: body
+        type: text
+EOF
+
+# generate
+gaplicator build app.yaml
+
+# start (DB + migrations + server)
+cd dist && ./dev.sh
+```
+
+Open `http://localhost:8080` — a working CRUD app with a React UI is ready.
+
+To stop: `./shutdown.sh`
+
 ## Stack
 
-| Layer    | Technology        |
-|----------|-------------------|
-| Database | PostgreSQL or MySQL |
-| Server   | Go + Gin + GORM   |
-| Client   | React + TypeScript + Vite |
+| Layer    | Technology                    |
+|----------|-------------------------------|
+| Database | PostgreSQL or MySQL           |
+| Server   | Go + Gin + GORM               |
+| Client   | React + TypeScript + Vite     |
 
 ## Usage
 
 ```bash
-gapp build <config.yaml> [-o <output-dir>]
+gaplicator build <config.yaml> [-o <output-dir>]
 ```
 
 | Flag | Default | Description |
@@ -93,7 +136,7 @@ All models include an auto-generated `id` primary key. The field names `id`, `cr
 
 ## What gets generated
 
-Running `gapp build app.yaml` produces:
+Running `gaplicator build app.yaml` produces:
 
 ```
 dist/
@@ -131,6 +174,13 @@ dist/
             ├── RegisterPage.tsx  # only with auth:
             └── {Model}Page.tsx   # CRUD table + inline form
 ```
+
+`dev.sh` does three things in order:
+1. Starts the database container (`postgres` or `mysql` depending on `database.driver`)
+2. Waits for the database to be healthy, then applies `migrations/001_initial.up.sql`
+3. Starts the Go server with `go run .`
+
+No local database client required — migrations run inside the container.
 
 ## Authentication
 
@@ -185,28 +235,6 @@ Every list endpoint supports filtering, full-text search, sorting, and paginatio
 **Example:** `GET /api/posts?q=hello&status=draft&author_id=5&sort_by=title&sort_dir=desc&page=2&limit=20`
 
 The React frontend generates corresponding UI controls: a search input, filter dropdowns for enum/boolean/FK fields, sortable column headers, pagination, and checkbox-based batch delete.
-
-## Getting Started
-
-```bash
-# install
-go install github.com/myAwesome/vibe-gen@latest
-
-# scaffold from config
-gapp build app.yaml
-
-# start generated app (DB + migrations + server in one command)
-cd dist && ./dev.sh
-```
-
-`dev.sh` does three things in order:
-1. Starts the database container (`postgres` or `mysql` depending on `database.driver`)
-2. Waits for the database to be healthy, then applies `migrations/001_initial.up.sql`
-3. Starts the Go server with `go run .`
-
-To stop: `./shutdown.sh`
-
-No local database client required — migrations run inside the container.
 
 ## Config reference
 

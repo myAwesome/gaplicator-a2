@@ -1,5 +1,5 @@
 /**
- * Generates a Gaplicator-compatible YAML string from the config state.
+ * Generates a gaplicator-compatible YAML string from the config state.
  */
 
 function needsQuotes(val) {

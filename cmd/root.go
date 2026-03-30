@@ -7,8 +7,8 @@ import (
 )
 
 var rootCmd = &cobra.Command{
-	Use:   "gapp",
-	Short: "A CLI tool",
+	Use:   "gaplicator",
+	Short: "Generate a full-stack web app from a YAML config",
 }
 
 func Execute() {

@@ -7,7 +7,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"gapp/internal/generator"
+	"github.com/myAwesome/gaplicator/internal/generator"
 )
 
 var outputPath string

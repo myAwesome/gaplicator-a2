@@ -1,4 +1,4 @@
-module gapp
+module github.com/myAwesome/gaplicator
 
 go 1.21.0
 
