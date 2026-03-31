@@ -47,6 +47,24 @@ var authGoTmpl string
 //go:embed templates/readme.md.tmpl
 var readmeTmpl string
 
+//go:embed templates/node_package_json.tmpl
+var nodePackageJSONTmpl string
+
+//go:embed templates/node_index_js.tmpl
+var nodeIndexJSTmpl string
+
+//go:embed templates/node_routes_js.tmpl
+var nodeRoutesJSTmpl string
+
+//go:embed templates/node_auth_js.tmpl
+var nodeAuthJSTmpl string
+
+//go:embed templates/node_prisma_schema.tmpl
+var nodePrismaSchmaTmpl string
+
+//go:embed templates/node_dev_sh.tmpl
+var nodeDevShTmpl string
+
 type AuthConfig struct {
 	Model string `yaml:"model"`
 }
@@ -59,8 +77,9 @@ type Config struct {
 }
 
 type AppConfig struct {
-	Name string `yaml:"name"`
-	Port int    `yaml:"port"`
+	Name   string `yaml:"name"`
+	Port   int    `yaml:"port"`
+	Server string `yaml:"server"` // "go" (default) or "node"
 }
 
 type DatabaseConfig struct {
@@ -116,6 +135,9 @@ func ParseConfig(path string) (*Config, error) {
 		return nil, fmt.Errorf("parse yaml: %w", err)
 	}
 
+	if cfg.App.Server == "" {
+		cfg.App.Server = "go"
+	}
 	if cfg.Database.Driver == "" {
 		cfg.Database.Driver = "postgres"
 	}
@@ -191,6 +213,11 @@ func ValidateConfig(cfg *Config) []error {
 	}
 	if cfg.App.Port < 1 || cfg.App.Port > 65535 {
 		errs = append(errs, fmt.Errorf("app.port must be between 1 and 65535"))
+	}
+	if cfg.App.Server == "" {
+		cfg.App.Server = "go"
+	} else if cfg.App.Server != "go" && cfg.App.Server != "node" {
+		errs = append(errs, fmt.Errorf("app.server must be \"go\" or \"node\""))
 	}
 	if cfg.Database.Driver == "" {
 		cfg.Database.Driver = "postgres"

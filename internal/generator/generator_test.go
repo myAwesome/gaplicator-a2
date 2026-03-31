@@ -275,7 +275,7 @@ func TestGenerateMain_RouterAndServer(t *testing.T) {
 
 	for _, want := range []string{
 		"gin.Default()",
-		"routes.RegisterRoutes(r, db)",
+		"routes.RegisterRoutes(api, db)",
 		`os.Getenv("APP_PORT")`,
 	} {
 		if !strings.Contains(out, want) {
@@ -2202,7 +2202,7 @@ func TestGenerateMain_WithAuth(t *testing.T) {
 	if !strings.Contains(out, "JWTMiddleware()") {
 		t.Error("expected JWTMiddleware() call")
 	}
-	if !strings.Contains(out, `r.Group("/")`) {
+	if !strings.Contains(out, `r.Group("/api")`) {
 		t.Error("expected authenticated group")
 	}
 }
@@ -2220,8 +2220,8 @@ func TestGenerateMain_WithoutAuth(t *testing.T) {
 	if strings.Contains(out, "RegisterAuthRoutes") {
 		t.Error("expected no RegisterAuthRoutes when auth is disabled")
 	}
-	if !strings.Contains(out, "routes.RegisterRoutes(r, db)") {
-		t.Error("expected direct routes.RegisterRoutes(r, db) call")
+	if !strings.Contains(out, "routes.RegisterRoutes(api, db)") {
+		t.Error("expected direct routes.RegisterRoutes(api, db) call")
 	}
 }
 

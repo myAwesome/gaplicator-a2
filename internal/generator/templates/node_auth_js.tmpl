@@ -1,0 +1,51 @@
+import bcrypt from 'bcryptjs';
+import jwt from 'jsonwebtoken';
+
+const JWT_SECRET = process.env.JWT_SECRET || 'change-me-in-production';
+
+export function jwtMiddleware(req, res, next) {
+  const header = req.headers['authorization'] || '';
+  const token = header.startsWith('Bearer ') ? header.slice(7) : null;
+  if (!token) return res.status(401).json({ error: 'unauthorized' });
+  try {
+    req.user = jwt.verify(token, JWT_SECRET);
+    next();
+  } catch {
+    res.status(401).json({ error: 'invalid token' });
+  }
+}
+
+export function registerAuthRoutes(app, prisma) {
+  app.post('/api/auth/register', async (req, res) => {
+    try {
+      const { {{.IdentityField}}, password, ...rest } = req.body;
+      const hash = await bcrypt.hash(password, 10);
+      const user = await prisma.{{.ModelCamel}}.create({
+        data: { {{.IdentityField}}, password: hash, ...rest },
+      });
+      res.status(201).json({ id: user.id });
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.post('/api/auth/login', async (req, res) => {
+    try {
+      const { {{.IdentityField}}, password } = req.body;
+      const user = await prisma.{{.ModelCamel}}.findFirst({
+        where: { {{.IdentityField}} },
+      });
+      if (!user || !(await bcrypt.compare(password, user.password))) {
+        return res.status(401).json({ error: 'invalid credentials' });
+      }
+      const token = jwt.sign(
+        { userId: user.id, {{.IdentityField}}: user.{{.IdentityField}} },
+        JWT_SECRET,
+        { expiresIn: '24h' },
+      );
+      res.json({ token });
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+}

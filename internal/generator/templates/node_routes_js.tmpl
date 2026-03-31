@@ -1,0 +1,108 @@
+export function registerRoutes(router, prisma) {
+{{range .Models}}  // ── {{.Name}} ──────────────────────────────────────────────────────────────
+
+  router.get('/{{.Name}}', async (req, res) => {
+    try {
+      const page = Math.max(1, parseInt(req.query.page) || 1);
+      const limit = Math.min(100, Math.max(1, parseInt(req.query.limit) || 20));
+      const skip = (page - 1) * limit;
+      const allowedSort = [{{range $i, $c := .SortColumns}}{{if $i}}, {{end}}'{{$c}}'{{end}}];
+      const sortBy = allowedSort.includes(req.query.sort_by) ? req.query.sort_by : 'id';
+      const sortDir = req.query.sort_dir === 'asc' ? 'asc' : 'desc';
+
+      const where = {};
+{{if .SearchColumns}}      if (req.query.q) {
+        where.OR = [{{range $i, $c := .SearchColumns}}{{if $i}}, {{end}}{ {{$c}}: { contains: req.query.q{{if $.IsPg}}, mode: 'insensitive'{{end}} } }{{end}}];
+      }
+{{end}}{{range .FilterColumns}}      if (req.query.{{.Name}} !== undefined) {
+{{if .IsNumeric}}        const n = parseInt(req.query.{{.Name}});
+        if (!isNaN(n)) where.{{.Name}} = n;
+{{else if .IsBool}}        if (req.query.{{.Name}} === 'true' || req.query.{{.Name}} === '1') where.{{.Name}} = true;
+        else if (req.query.{{.Name}} === 'false' || req.query.{{.Name}} === '0') where.{{.Name}} = false;
+{{else}}        where.{{.Name}} = req.query.{{.Name}};
+{{end}}      }
+{{end}}
+      const [data, total] = await prisma.$transaction([
+        prisma.{{.CamelName}}.findMany({
+          where,
+          skip,
+          take: limit,
+          orderBy: { [sortBy]: sortDir },{{if .HasM2M}}
+          include: { {{range $i, $r := .M2MRelations}}{{if $i}}, {{end}}{{$r.Field}}: true{{end}} },{{end}}
+        }),
+        prisma.{{.CamelName}}.count({ where }),
+      ]);
+
+      res.json({ data, total, page, limit });
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  router.get('/{{.Name}}/:id', async (req, res) => {
+    try {
+      const row = await prisma.{{.CamelName}}.findUnique({
+        where: { id: parseInt(req.params.id) },{{if .HasM2M}}
+        include: { {{range $i, $r := .M2MRelations}}{{if $i}}, {{end}}{{$r.Field}}: true{{end}} },{{end}}
+      });
+      if (!row) return res.status(404).json({ error: 'not found' });
+      res.json(row);
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  router.post('/{{.Name}}', async (req, res) => {
+    try {
+      const { {{range $i, $r := .M2MRelations}}{{if $i}}, {{end}}{{$r.IdsField}}{{end}}{{if and .HasM2M .HasPlainFields}}, {{end}}...data } = req.body;
+      const row = await prisma.{{.CamelName}}.create({
+        data: {
+          ...data,{{range .M2MRelations}}
+          {{.Field}}: {{.IdsField}} ? { connect: {{.IdsField}}.map(id => ({ id })) } : undefined,{{end}}
+        },{{if .HasM2M}}
+        include: { {{range $i, $r := .M2MRelations}}{{if $i}}, {{end}}{{$r.Field}}: true{{end}} },{{end}}
+      });
+      res.status(201).json(row);
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  router.put('/{{.Name}}/:id', async (req, res) => {
+    try {
+      const { {{range $i, $r := .M2MRelations}}{{if $i}}, {{end}}{{$r.IdsField}}{{end}}{{if and .HasM2M .HasPlainFields}}, {{end}}...data } = req.body;
+      const row = await prisma.{{.CamelName}}.update({
+        where: { id: parseInt(req.params.id) },
+        data: {
+          ...data,{{range .M2MRelations}}
+          {{.Field}}: {{.IdsField}} ? { set: {{.IdsField}}.map(id => ({ id })) } : undefined,{{end}}
+        },{{if .HasM2M}}
+        include: { {{range $i, $r := .M2MRelations}}{{if $i}}, {{end}}{{$r.Field}}: true{{end}} },{{end}}
+      });
+      res.json(row);
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  router.delete('/{{.Name}}/batch', async (req, res) => {
+    try {
+      const { ids } = req.body;
+      if (!ids || ids.length === 0) return res.status(400).json({ error: 'ids required' });
+      await prisma.{{.CamelName}}.deleteMany({ where: { id: { in: ids } } });
+      res.sendStatus(204);
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  router.delete('/{{.Name}}/:id', async (req, res) => {
+    try {
+      await prisma.{{.CamelName}}.delete({ where: { id: parseInt(req.params.id) } });
+      res.sendStatus(204);
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+{{end}}}

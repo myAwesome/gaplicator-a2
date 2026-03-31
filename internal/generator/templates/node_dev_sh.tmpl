@@ -1,0 +1,55 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+cd "$(dirname "$0")"
+
+# Load .env if present
+if [ -f .env ]; then
+  set -a && source .env && set +a
+fi
+
+# ── 1. Database ────────────────────────────────────────────────────────────────
+echo "▸ Starting database..."
+{{if .IsMySQL}}docker compose up -d mysql
+
+echo -n "▸ Waiting for database to be ready..."
+until docker compose exec -T mysql mysqladmin ping -h 127.0.0.1 -uroot -p"$DB_PASSWORD" >/dev/null 2>&1; do
+  printf "."
+  sleep 1
+done
+echo " ready"
+{{else}}docker compose up -d postgres
+
+echo -n "▸ Waiting for database to be ready..."
+until docker compose exec -T postgres pg_isready -U "$DB_USER" -d "$DB_NAME" >/dev/null 2>&1; do
+  printf "."
+  sleep 1
+done
+echo " ready"
+{{end}}
+# ── 2. Migrations (Prisma) ─────────────────────────────────────────────────────
+echo "▸ Applying migrations..."
+npx prisma migrate deploy
+echo "  migrations applied"
+
+# ── 3. Server ──────────────────────────────────────────────────────────────────
+echo "▸ Installing server dependencies..."
+npm install
+
+echo "▸ Starting server on port {{.Port}} (background)..."
+npm run dev &
+SERVER_PID=$!
+
+# ── 4. Client ──────────────────────────────────────────────────────────────────
+echo "▸ Installing client dependencies..."
+(cd client && npm install)
+
+echo "▸ Starting client dev server..."
+(cd client && npm run dev) &
+CLIENT_PID=$!
+
+# Open browser after short delay
+(sleep 5 && open "http://localhost:5173") &
+
+trap "kill $SERVER_PID $CLIENT_PID 2>/dev/null; exit" INT TERM
+wait $SERVER_PID $CLIENT_PID

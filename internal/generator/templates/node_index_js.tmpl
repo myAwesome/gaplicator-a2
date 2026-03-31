@@ -1,0 +1,32 @@
+import express from 'express';
+import { PrismaClient } from '@prisma/client';
+import { registerRoutes } from './routes.js';
+{{if .HasAuth}}import { registerAuthRoutes, jwtMiddleware } from './auth.js';
+{{end}}
+const app = express();
+const prisma = new PrismaClient();
+
+app.use(express.json());
+
+app.use((req, res, next) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  if (req.method === 'OPTIONS') return res.sendStatus(204);
+  next();
+});
+
+{{if .HasAuth}}registerAuthRoutes(app, prisma);
+
+const api = express.Router();
+api.use(jwtMiddleware);
+registerRoutes(api, prisma);
+app.use('/api', api);
+{{else}}const api = express.Router();
+registerRoutes(api, prisma);
+app.use('/api', api);
+{{end}}
+const port = process.env.APP_PORT || {{.Port}};
+app.listen(port, () => {
+  console.log(`Server running on port ${port}`);
+});

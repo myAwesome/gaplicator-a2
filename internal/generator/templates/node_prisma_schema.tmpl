@@ -1,0 +1,22 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "{{.DBProvider}}"
+  url      = env("DATABASE_URL")
+}
+
+{{range .Models}}model {{.StructName}} {
+  id  Int  @id @default(autoincrement())
+{{range .Fields}}  {{.Name}}  {{.PrismaType}}{{if .IsRequired}} {{end}}{{range .Attrs}} {{.}}{{end}}
+{{end}}{{if .HasTimestamps}}  createdAt  DateTime  @default(now()) @map("created_at")
+  updatedAt  DateTime  @updatedAt @map("updated_at")
+  deletedAt  DateTime? @map("deleted_at")
+{{end}}{{range .M2MRelations}}  {{.Field}}  {{.ModelName}}[]  @relation("{{.JoinTable}}")
+{{end}}{{range .BackRelations}}  {{.Field}}  {{.ModelName}}[]
+{{end}}
+  @@map("{{.TableName}}")
+}
+
+{{end}}
