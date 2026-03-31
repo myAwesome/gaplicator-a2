@@ -6,7 +6,7 @@ Generate a full-stack web application (database + server + client) from a single
 
 - **Go 1.21+** — to install and run gaplicator
 - **Docker** — to run the database via the generated `dev.sh`
-- **Node.js 18+** — to run the generated React frontend
+- **Node.js 18+** — to run the generated React frontend (and the Node.js backend when `server: node`)
 
 ## Quick start
 
@@ -47,11 +47,12 @@ To stop: `./shutdown.sh`
 
 ## Stack
 
-| Layer    | Technology                    |
-|----------|-------------------------------|
-| Database | PostgreSQL or MySQL           |
-| Server   | Go + Gin + GORM               |
-| Client   | React + TypeScript + Vite     |
+| Layer    | Technology                               |
+|----------|------------------------------------------|
+| Database | PostgreSQL or MySQL                      |
+| Server   | Go + Gin + GORM *(default)*              |
+|          | Node.js + Express + Prisma *(optional)*  |
+| Client   | React + TypeScript + Vite                |
 
 ## Usage
 
@@ -67,8 +68,9 @@ gaplicator build <config.yaml> [-o <output-dir>]
 
 ```yaml
 app:
-  name: my-app   # lowercase letters, digits, hyphens, underscores; used as Go module name
+  name: my-app   # lowercase letters, digits, hyphens, underscores; used as module name
   port: 8080     # 1–65535
+  server: go     # optional: "go" (default) or "node"
 
 database:
   driver: postgres # optional: "postgres" (default) or "mysql"
@@ -136,49 +138,72 @@ All models include an auto-generated `id` primary key. The field names `id`, `cr
 
 ## What gets generated
 
-Running `gaplicator build app.yaml` produces:
+Running `gaplicator build app.yaml` produces different backend files depending on `app.server`.
+
+### `server: go` (default)
 
 ```
 dist/
 ├── main.go                        # Gin server + GORM auto-migrate
 ├── auth.go                        # JWT handlers — only with auth: config
 ├── go.mod                         # module with gin/gorm/postgres deps
-├── docker-compose.yml             # app + postgres services
+├── docker-compose.yml             # app + postgres/mysql services
 ├── .env                           # DB credentials (+ JWT_SECRET with auth:)
 ├── dev.sh                         # one-command dev startup (see below)
 ├── shutdown.sh                    # stops docker containers
 ├── migrations/
-│   ├── 001_initial.up.sql
-│   └── 001_initial.down.sql
+│   └── 001_initial.up.sql
 ├── models/
-│   └── models.go                  # GORM structs (password field hidden with json:"-")
+│   └── models.go                  # GORM structs (password hidden with json:"-")
 ├── routes/
 │   └── routes.go                  # Gin CRUD handlers
-└── client/                        # React + TypeScript frontend
-    ├── package.json               # react, react-router-dom, vite
-    ├── index.html
-    ├── vite.config.ts             # dev proxy → Go backend
-    ├── tsconfig.json
-    └── src/
-        ├── main.tsx
-        ├── App.tsx                # nav + routes (ProtectedRoute wrapping with auth:)
-        ├── context/
-        │   └── AuthContext.tsx   # AuthProvider, useAuth, getToken — only with auth:
-        ├── types/
-        │   └── {model}.ts        # TypeScript interfaces
-        ├── api/
-        │   ├── auth.ts           # login/register fetch functions — only with auth:
-        │   └── {model}.ts        # fetch wrappers (Authorization header with auth:)
-        └── pages/
-            ├── LoginPage.tsx     # only with auth:
-            ├── RegisterPage.tsx  # only with auth:
-            └── {Model}Page.tsx   # CRUD table + inline form
+└── client/                        # React + TypeScript frontend (same for both backends)
 ```
 
-`dev.sh` does three things in order:
-1. Starts the database container (`postgres` or `mysql` depending on `database.driver`)
-2. Waits for the database to be healthy, then applies `migrations/001_initial.up.sql`
-3. Starts the Go server with `go run .`
+`dev.sh` order: start DB container → wait healthy → apply `migrations/001_initial.up.sql` → `go run .`
+
+### `server: node`
+
+```
+dist/
+├── index.js                       # Express server entry point
+├── routes.js                      # CRUD handlers for all models
+├── auth.js                        # bcrypt + JWT — only with auth: config
+├── package.json                   # express, @prisma/client, bcryptjs, jsonwebtoken
+├── prisma/
+│   └── schema.prisma              # Prisma schema (models, relations, @@map)
+├── docker-compose.yml             # app + postgres/mysql services
+├── .env                           # DB credentials (DATABASE_URL + JWT_SECRET)
+├── dev.sh                         # one-command dev startup (see below)
+├── shutdown.sh                    # stops docker containers
+└── client/                        # React + TypeScript frontend (same for both backends)
+```
+
+`dev.sh` order: start DB container → wait healthy → `npx prisma migrate deploy` → `npm run dev`
+
+Both backends produce an identical React client under `client/`:
+
+```
+client/
+├── package.json               # react, react-router-dom, vite
+├── index.html
+├── vite.config.ts             # dev proxy → backend
+├── tsconfig.json
+└── src/
+    ├── main.tsx
+    ├── App.tsx                # nav + routes (ProtectedRoute wrapping with auth:)
+    ├── context/
+    │   └── AuthContext.tsx   # AuthProvider, useAuth, getToken — only with auth:
+    ├── types/
+    │   └── {model}.ts        # TypeScript interfaces
+    ├── api/
+    │   ├── auth.ts           # login/register fetch functions — only with auth:
+    │   └── {model}.ts        # fetch wrappers (Authorization header with auth:)
+    └── pages/
+        ├── LoginPage.tsx     # only with auth:
+        ├── RegisterPage.tsx  # only with auth:
+        └── {Model}Page.tsx   # CRUD table + inline form
+```
 
 No local database client required — migrations run inside the container.
 

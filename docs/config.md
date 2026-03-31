@@ -6,6 +6,7 @@ A gaplicator config file is a YAML document with up to four top-level sections: 
 app:
   name: my-app
   port: 8080
+  server: go        # optional: "go" (default) or "node"
 
 database:
   driver: postgres  # optional: "postgres" (default) or "mysql"
@@ -27,10 +28,20 @@ models:
 
 ## `app`
 
-| Key | Type | Required | Description |
-|-----|------|----------|-------------|
-| `name` | string | yes | Application name. Used as the Go module name and React app title. Must match `^[a-z][a-z0-9_-]*$` (lowercase letters, digits, hyphens, underscores). |
-| `port` | int | yes | HTTP port the generated server listens on. Must be between 1 and 65535. |
+| Key | Type | Required | Default | Description |
+|-----|------|----------|---------|-------------|
+| `name` | string | yes | — | Application name. Used as the module name and React app title. Must match `^[a-z][a-z0-9_-]*$` (lowercase letters, digits, hyphens, underscores). |
+| `port` | int | yes | — | HTTP port the generated server listens on. Must be between 1 and 65535. |
+| `server` | string | no | `go` | Backend server to generate. Accepted values: `go` (Gin + GORM), `node` (Express + Prisma). |
+
+### Server backends
+
+| Value | Stack | Entry point | ORM / DB layer | Auth deps |
+|-------|-------|-------------|----------------|-----------|
+| `go` | Go + Gin + GORM | `main.go` | GORM migrations (`migrations/`) | `golang-jwt/jwt`, `golang.org/x/crypto` |
+| `node` | Node.js + Express + Prisma | `index.js` | Prisma schema (`prisma/schema.prisma`) | `bcryptjs`, `jsonwebtoken` |
+
+Both backends expose identical REST routes and share the same React client.
 
 ---
 
@@ -67,11 +78,12 @@ Optional. When present, enables JWT-based authentication for the generated app.
 
 **What gets generated when `auth` is set:**
 
-- **`auth.go`** — `POST /auth/register` and `POST /auth/login` handlers (bcrypt + JWT HS256), plus `JWTMiddleware` that validates the `Authorization: Bearer <token>` header
+- **`auth.go`** *(server: go)* / **`auth.js`** *(server: node)* — `POST /api/auth/register` and `POST /api/auth/login` handlers (bcrypt + JWT HS256), plus JWT middleware that validates the `Authorization: Bearer <token>` header
 - All model CRUD routes are mounted behind the JWT middleware — unauthenticated requests get `401`
-- **`go.mod`** — adds `golang-jwt/jwt/v5` and `golang.org/x/crypto`
+- **`go.mod`** *(server: go)* — adds `golang-jwt/jwt/v5` and `golang.org/x/crypto`
+- **`package.json`** *(server: node)* — adds `bcryptjs` and `jsonwebtoken`
 - **`.env`** — adds `JWT_SECRET=change-me-in-production`
-- **`models/models.go`** — the `password` field gets `json:"-"` so it is never included in API responses
+- **`models/models.go`** *(server: go)* — the `password` field gets `json:"-"` so it is never included in API responses
 - **React client** — `AuthContext`, `LoginPage`, `RegisterPage`, `ProtectedRoute`, and `Authorization` headers on all fetch calls
 
 **Identity field** — the field used as the login identifier is auto-detected from the auth model: `email` takes priority over `username`, then the first `varchar`/`text` field.
