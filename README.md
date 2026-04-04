@@ -76,15 +76,23 @@ gaplicator serve [--host <host>] [--port <port>]
 
 ### Web Bridge (schema generator -> CLI)
 
-Run a local bridge so the web app can send generated YAML directly to the CLI:
+Run both the bridge and web schema generator with one command:
 
 ```bash
-gaplicator serve --host 127.0.0.1 --port 8787
+./dev.sh
 ```
 
-Run the web schema generator in a separate terminal:
+This starts:
+- bridge at `http://127.0.0.1:8787`
+- web app at `http://127.0.0.1:5173`
+
+Manual alternative (two terminals):
 
 ```bash
+# terminal 1
+gaplicator serve --host 127.0.0.1 --port 8787
+
+# terminal 2
 cd web
 npm install
 npm run dev
