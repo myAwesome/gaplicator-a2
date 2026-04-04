@@ -41,6 +41,17 @@ export default function AppSection({ app, onChange }) {
               />
             </div>
           </div>
+          <div className="form-group">
+            <label className="form-label">Server</label>
+            <select
+              className="form-select"
+              value={app.server || 'go'}
+              onChange={e => onChange({ server: e.target.value })}
+            >
+              <option value="go">Go (Gin + GORM)</option>
+              <option value="node">Node.js (Express + Prisma)</option>
+            </select>
+          </div>
         </div>
       )}
     </div>

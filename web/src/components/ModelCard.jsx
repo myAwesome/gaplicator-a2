@@ -70,6 +70,16 @@ export default function ModelCard({ model, onChange, onDelete, allModelNames }) 
             />
           </div>
 
+          <label
+            className="toggle-switch"
+            onClick={() => onChange({ timestamps: !model.timestamps })}
+          >
+            <div className={`toggle-track ${model.timestamps ? 'on' : ''}`}>
+              <div className="toggle-thumb" />
+            </div>
+            <span className="toggle-label">Enable timestamps (`created_at`, `updated_at`, `deleted_at`)</span>
+          </label>
+
           {/* Many-to-many */}
           {otherModels.length > 0 && (
             <div className="form-group">

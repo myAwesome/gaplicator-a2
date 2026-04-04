@@ -7,10 +7,54 @@ function makeId() {
 
 function defaultConfig(slug) {
   return {
-    app: { name: slug || 'my-app', port: 8080 },
+    app: { name: slug || 'my-app', port: 8080, server: 'go' },
     database: { driver: 'postgres', host: 'localhost', port: 5432, name: (slug || 'my_app').replace(/-/g, '_'), user: 'postgres', password: 'secret' },
     auth: { enabled: false, model: '' },
     models: [],
+  }
+}
+
+function normalizeConfig(config = {}) {
+  const driver = config.database?.driver || 'postgres'
+  const defaultPort = driver === 'mysql' ? 3306 : 5432
+  const defaultUser = driver === 'mysql' ? 'root' : 'postgres'
+
+  const app = {
+    name: config.app?.name ?? 'my-app',
+    port: config.app?.port ?? 8080,
+    server: config.app?.server || 'go',
+  }
+
+  const database = {
+    driver,
+    host: config.database?.host ?? 'localhost',
+    port: config.database?.port ?? defaultPort,
+    name: config.database?.name ?? 'my_db',
+    user: config.database?.user ?? defaultUser,
+    password: config.database?.password ?? 'secret',
+  }
+
+  const auth = {
+    enabled: !!config.auth?.enabled,
+    model: config.auth?.model || '',
+  }
+
+  const models = Array.isArray(config.models)
+    ? config.models.map(model => ({
+      ...model,
+      timestamps: !!model.timestamps,
+      many_to_many: Array.isArray(model.many_to_many) ? model.many_to_many : [],
+      fields: Array.isArray(model.fields) ? model.fields : [],
+    }))
+    : []
+
+  return { app, database, auth, models }
+}
+
+function normalizeProject(project) {
+  return {
+    ...project,
+    config: normalizeConfig(project.config),
   }
 }
 
@@ -19,7 +63,7 @@ export function loadProjects() {
     const raw = localStorage.getItem(PROJECTS_KEY)
     if (raw) {
       const parsed = JSON.parse(raw)
-      if (Array.isArray(parsed) && parsed.length > 0) return parsed
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed.map(normalizeProject)
     }
   } catch (_) {}
 
@@ -32,7 +76,7 @@ export function loadProjects() {
         id: makeId(),
         name: oldConfig.app?.name || 'My Project',
         type: 'full',
-        config: oldConfig,
+        config: normalizeConfig(oldConfig),
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       }]

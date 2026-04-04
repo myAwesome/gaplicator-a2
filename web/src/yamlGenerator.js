@@ -84,6 +84,9 @@ export function generateYaml(config) {
   lines.push('app:')
   lines.push(`  name: ${yamlStr(config.app.name || 'my-app')}`)
   lines.push(`  port: ${Number(config.app.port) || 8080}`)
+  if ((config.app.server || 'go') !== 'go') {
+    lines.push(`  server: ${yamlStr(config.app.server)}`)
+  }
   lines.push('')
 
   // ── database ─────────────────────────────────────────────
@@ -120,6 +123,9 @@ export function generateYaml(config) {
     for (const model of config.models) {
       if (!model.name) continue
       lines.push(`  - name: ${yamlStr(model.name)}`)
+      if (model.timestamps) {
+        lines.push('    timestamps: true')
+      }
 
       const m2m = model.many_to_many.filter(Boolean)
       if (m2m.length > 0) {
